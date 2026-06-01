@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { bootstrapAutoTrader } from "./services/autoTrader.js";
 import { bootstrapOkxSwapAiEngine } from "./services/okxSwapAiEngine.js";
+import { bootstrapOkxSwapOptimizer } from "./services/okxSwapOptimizerRunner.js";
 
 // OKX Swap AI Demo stress-test defaults. Railway Variables still take precedence.
 process.env.OKX_SWAP_MAX_POSITIONS ??= "20";
@@ -14,6 +15,14 @@ process.env.OKX_SWAP_SCAN_BATCH ??= "20";
 process.env.OKX_SWAP_AI_INTERVAL_MS ??= "30000";
 process.env.OKX_SWAP_AI_LONG_SCORE ??= "63";
 process.env.OKX_SWAP_AI_SHORT_SCORE ??= "37";
+
+// Read-only shadow learning defaults. This service reads public OKX market data,
+// simulates candidate profiles, and never places orders or changes live settings.
+process.env.OKX_SWAP_OPTIMIZER_ENABLED ??= "true";
+process.env.OKX_SWAP_OPTIMIZER_INTERVAL_MS ??= "60000";
+process.env.OKX_SWAP_OPTIMIZER_SCAN_BATCH ??= "12";
+process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES ??= "24";
+process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT ??= "5";
 
 const rawPort = process.env["PORT"];
 
@@ -38,4 +47,5 @@ app.listen(port, (err) => {
   logger.info({ port }, "Server listening");
   bootstrapAutoTrader();
   bootstrapOkxSwapAiEngine();
+  bootstrapOkxSwapOptimizer();
 });
