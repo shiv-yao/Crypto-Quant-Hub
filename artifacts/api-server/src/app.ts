@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "node:path";
+import { existsSync } from "node:fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -30,5 +32,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+const frontendDir = path.resolve(process.cwd(), "artifacts/crypto-quant/dist/public");
+const frontendIndex = path.join(frontendDir, "index.html");
+
+if (existsSync(frontendIndex)) {
+  app.use(express.static(frontendDir));
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+    res.sendFile(frontendIndex);
+  });
+} else {
+  logger.warn({ frontendDir }, "Frontend build not found; API-only mode enabled");
+}
 
 export default app;
