@@ -34,6 +34,14 @@ const skills = new Map<string, OkxSwapSkillDefinition>([
     status: "enabled",
     version: "1.0.0",
   }],
+  ["okx.swap.shadow-optimizer", {
+    id: "okx.swap.shadow-optimizer",
+    name: "OKX 影子參數驗證",
+    description: "以 Demo 影子策略比較候選參數；只有樣本足夠且風險調整後分數改善時才更新參數組。",
+    category: "ai",
+    status: "enabled",
+    version: "1.0.0",
+  }],
   ["okx.swap.risk-guard", {
     id: "okx.swap.risk-guard",
     name: "OKX 合約風控閘門",
