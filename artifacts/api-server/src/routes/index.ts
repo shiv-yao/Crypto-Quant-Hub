@@ -9,6 +9,7 @@ import marketRouter from "./market";
 import settingsRouter from "./settings";
 import exchangeRouter from "./exchange";
 import bitgetRouter from "./bitget";
+import okxRouter from "./okx";
 import auditLogsRouter from "./auditLogs";
 
 const router: IRouter = Router();
@@ -24,6 +25,7 @@ router.use("/dashboard", marketRouter);
 router.use("/settings", settingsRouter);
 router.use("/exchange", exchangeRouter);
 router.use("/bitget", bitgetRouter);
+router.use("/okx", okxRouter);
 router.use("/audit-logs", auditLogsRouter);
 
 export default router;
