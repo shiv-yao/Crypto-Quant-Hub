@@ -15,11 +15,12 @@ import Settings from "@/pages/settings";
 import Trading from "@/pages/trading";
 import Bitget from "@/pages/bitget";
 import Okx from "@/pages/okx";
+import AutoTrading from "@/pages/auto-trading";
 import AuditLogs from "@/pages/audit-logs";
 import {
   LayoutDashboard, Layers, BarChart2, Activity, ShieldAlert, List,
   Settings as SettingsIcon, Menu, X, TrendingUp, CandlestickChart, FileText,
-  AlertTriangle, Wifi, Radio
+  AlertTriangle, Wifi, Radio, Bot
 } from "lucide-react";
 import { useState } from "react";
 import { useGetExchangeStatus } from "@workspace/api-client-react";
@@ -32,6 +33,7 @@ const queryClient = new QueryClient({
 
 const NAV_ITEMS = [
   { path: "/", label: "儀表板", icon: LayoutDashboard },
+  { path: "/auto-trading", label: "自動交易", icon: Bot },
   { path: "/strategies", label: "策略管理", icon: Layers },
   { path: "/backtests", label: "回測", icon: BarChart2 },
   { path: "/paper-trading", label: "模擬交易", icon: Activity },
@@ -183,6 +185,7 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Dashboard} />
+        <Route path="/auto-trading" component={AutoTrading} />
         <Route path="/strategies/new" component={NewStrategy} />
         <Route path="/strategies" component={Strategies} />
         <Route path="/backtests/:id" component={BacktestDetail} />
