@@ -12,11 +12,15 @@ import PaperTrading from "@/pages/paper-trading";
 import Risk from "@/pages/risk";
 import Trades from "@/pages/trades";
 import Settings from "@/pages/settings";
+import Trading from "@/pages/trading";
+import AuditLogs from "@/pages/audit-logs";
 import {
-  LayoutDashboard, Layers, BarChart2, Activity, ShieldAlert, List, Settings as SettingsIcon,
-  Menu, X, TrendingUp
+  LayoutDashboard, Layers, BarChart2, Activity, ShieldAlert, List,
+  Settings as SettingsIcon, Menu, X, TrendingUp, CandlestickChart, FileText,
+  AlertTriangle, Wifi, WifiOff
 } from "lucide-react";
 import { useState } from "react";
+import { useGetExchangeStatus } from "@workspace/api-client-react";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,13 +33,46 @@ const NAV_ITEMS = [
   { path: "/strategies", label: "策略管理", icon: Layers },
   { path: "/backtests", label: "回測", icon: BarChart2 },
   { path: "/paper-trading", label: "模擬交易", icon: Activity },
+  { path: "/trading", label: "手動交易", icon: CandlestickChart },
   { path: "/risk", label: "風險管理", icon: ShieldAlert },
   { path: "/trades", label: "交易紀錄", icon: List },
+  { path: "/audit-logs", label: "稽核紀錄", icon: FileText },
   { path: "/settings", label: "系統設定", icon: SettingsIcon },
 ];
 
+function ModeStatusBar() {
+  const { data: status } = useGetExchangeStatus();
+  const isLive = status?.systemMode === "live" && status?.tradingEnabled;
+  const isConnected = status?.isConnected ?? false;
+
+  if (!status) {
+    return (
+      <div className="flex items-center gap-2 px-2.5 py-1 rounded-full border border-primary/40 bg-primary/10 text-xs font-medium text-primary">
+        <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+        模擬模式
+      </div>
+    );
+  }
+
+  return (
+    <div className={`flex items-center gap-2 px-2.5 py-1 rounded-full border text-xs font-medium
+      ${isLive ? "bg-red-500/10 border-red-500/40 text-red-400" : "bg-primary/10 border-primary/40 text-primary"}`}>
+      {isConnected
+        ? <Wifi size={11} className={isLive ? "text-red-400" : "text-primary"} />
+        : <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-red-400" : "bg-primary"} animate-pulse`} />}
+      <span>
+        {isLive ? "⚠️ 真實交易"
+          : isConnected ? `${status.networkMode === "mainnet" ? "主網" : "測試網"}已連線`
+          : "模擬模式"}
+      </span>
+    </div>
+  );
+}
+
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [location] = useLocation();
+  const { data: status } = useGetExchangeStatus();
+  const isLive = status?.systemMode === "live" && status?.tradingEnabled;
 
   return (
     <>
@@ -54,10 +91,12 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
             <div>
               <p className="text-sm font-bold text-foreground leading-tight">QuantSys</p>
-              <p className="text-xs text-primary leading-tight">模擬模式</p>
+              <p className={`text-xs leading-tight ${isLive ? "text-red-400" : "text-primary"}`}>
+                {isLive ? "⚠️ 真實交易" : "模擬模式"}
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground" data-testid="button-close-sidebar">
+          <button onClick={onClose} className="lg:hidden text-muted-foreground hover:text-foreground">
             <X size={14} />
           </button>
         </div>
@@ -65,19 +104,24 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {NAV_ITEMS.map(({ path, label, icon: Icon }) => {
             const isActive = path === "/" ? location === "/" : location.startsWith(path);
+            const isTrading = path === "/trading";
             return (
               <Link key={path} href={path}>
                 <div
                   onClick={onClose}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
                     isActive
-                      ? "bg-primary/15 text-primary border border-primary/25"
+                      ? isTrading && isLive
+                        ? "bg-red-500/15 text-red-400 border border-red-500/25"
+                        : "bg-primary/15 text-primary border border-primary/25"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
-                  data-testid={`nav-${path.replace("/", "") || "home"}`}
                 >
                   <Icon size={14} />
                   {label}
+                  {isTrading && isLive && (
+                    <AlertTriangle size={11} className="ml-auto text-red-400" />
+                  )}
                 </div>
               </Link>
             );
@@ -85,9 +129,16 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         </nav>
 
         <div className="p-3 border-t border-border">
-          <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-            <p className="text-xs text-amber-400 leading-relaxed">本系統僅供研究與模擬，不構成投資建議</p>
-          </div>
+          {isLive ? (
+            <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30">
+              <p className="text-xs text-red-400 leading-relaxed font-semibold">⚠️ 真實交易模式</p>
+              <p className="text-xs text-red-300/80 leading-relaxed">所有訂單使用真實資金</p>
+            </div>
+          ) : (
+            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <p className="text-xs text-amber-400 leading-relaxed">本系統僅供研究與模擬，不構成投資建議</p>
+            </div>
+          )}
         </div>
       </aside>
     </>
@@ -110,10 +161,7 @@ function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 text-xs text-muted-foreground font-mono">
           加密貨幣量化交易研究平台
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-          <span className="text-xs font-medium text-primary">模擬模式</span>
-        </div>
+        <ModeStatusBar />
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -136,8 +184,10 @@ function Router() {
         <Route path="/backtests/:id" component={BacktestDetail} />
         <Route path="/backtests" component={Backtests} />
         <Route path="/paper-trading" component={PaperTrading} />
+        <Route path="/trading" component={Trading} />
         <Route path="/risk" component={Risk} />
         <Route path="/trades" component={Trades} />
+        <Route path="/audit-logs" component={AuditLogs} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

@@ -1,21 +1,32 @@
-import { useGetDashboardStats, useGetMarketSummary } from "@workspace/api-client-react";
-import { TrendingUp, TrendingDown, Activity, BarChart2, Layers, AlertTriangle, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { useGetDashboardStats, useGetMarketSummary, useGetExchangeStatus } from "@workspace/api-client-react";
+import { TrendingUp, TrendingDown, Activity, BarChart2, Layers, AlertTriangle, ArrowUpRight, ArrowDownRight, Wifi, WifiOff, Database, Radio, Info } from "lucide-react";
 
-function MarketTicker() {
-  const { data: tickers } = useGetMarketSummary();
-  const items = tickers ?? [
-    { symbol: "BTC/USDT", price: 67342.5, changePct24h: 2.78 },
-    { symbol: "ETH/USDT", price: 3521.8, changePct24h: -2.42 },
-    { symbol: "SOL/USDT", price: 182.45, changePct24h: 5.38 },
-    { symbol: "BNB/USDT", price: 598.2, changePct24h: -2.03 },
-    { symbol: "XRP/USDT", price: 0.5843, changePct24h: 4.17 },
-    { symbol: "ADA/USDT", price: 0.4521, changePct24h: -2.65 },
-  ];
+const SOURCE_LABELS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+  demo: { label: "示範資料", color: "text-muted-foreground", icon: Database },
+  binance_public: { label: "Binance 公開 API", color: "text-amber-400", icon: Radio },
+  binance_testnet: { label: "Binance 測試網", color: "text-amber-400", icon: Wifi },
+  binance_live: { label: "Binance 即時", color: "text-emerald-400", icon: Wifi },
+};
 
+function DataSourceBadge({ source, lastUpdated }: { source?: string; lastUpdated?: string }) {
+  const cfg = SOURCE_LABELS[source ?? "demo"] ?? SOURCE_LABELS.demo;
+  const Icon = cfg.icon;
+  const age = lastUpdated ? Math.round((Date.now() - new Date(lastUpdated).getTime()) / 1000) : null;
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Icon size={11} className={cfg.color} />
+      <span className={cfg.color}>{cfg.label}</span>
+      {age !== null && <span>· {age < 60 ? `${age}秒前` : `${Math.round(age / 60)}分鐘前`}更新</span>}
+    </div>
+  );
+}
+
+function MarketTicker({ tickers }: { tickers: Array<{ symbol: string; price: number; changePct24h: number }> }) {
   return (
     <div className="border-b border-border bg-card/50 overflow-hidden">
       <div className="flex animate-marquee whitespace-nowrap">
-        {[...items, ...items].map((t, i) => (
+        {[...tickers, ...tickers].map((t, i) => (
           <div key={i} className="inline-flex items-center gap-2 px-6 py-2 border-r border-border/40">
             <span className="text-xs font-mono font-semibold text-foreground">{t.symbol}</span>
             <span className="text-xs font-mono text-foreground">
@@ -36,7 +47,7 @@ function StatCard({ label, value, sub, positive, icon: Icon }: {
   label: string; value: string; sub?: string; positive?: boolean; icon: React.ElementType;
 }) {
   return (
-    <div className="bg-card border border-border rounded-lg p-4" data-testid={`stat-card-${label}`}>
+    <div className="bg-card border border-border rounded-lg p-4">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs text-muted-foreground mb-1">{label}</p>
@@ -55,25 +66,17 @@ function StatCard({ label, value, sub, positive, icon: Icon }: {
   );
 }
 
-const ACTIVITY_ICONS: Record<string, string> = {
-  backtest: "bg-primary/20 text-primary",
-  trade: "bg-emerald-500/20 text-emerald-400",
-  risk: "bg-red-500/20 text-red-400",
-  strategy: "bg-violet-500/20 text-violet-400",
-};
-
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetDashboardStats();
   const { data: market } = useGetMarketSummary();
+  const { data: exchStatus } = useGetExchangeStatus();
+
+  const isConnected = exchStatus?.isConnected ?? false;
+  const systemMode = exchStatus?.systemMode ?? "paper";
 
   const demoStats = {
-    totalStrategies: 4,
-    activeStrategies: 3,
-    totalBacktests: 6,
-    totalTrades: 47,
-    paperTradingPnl: 352.5,
-    paperTradingPnlPct: 3.53,
-    systemMode: "paper" as const,
+    totalStrategies: 4, activeStrategies: 3, totalBacktests: 6, totalTrades: 47,
+    paperTradingPnl: 352.5, paperTradingPnlPct: 3.53, systemMode: "paper" as const,
     recentActivity: [
       { id: 1, type: "backtest", description: "回測完成：BTC 均線交叉策略，報酬率 +32.4%", timestamp: new Date(Date.now() - 3600000).toISOString() },
       { id: 2, type: "trade", description: "模擬買入 BTC/USDT 0.05 枚 @ 67,342", timestamp: new Date(Date.now() - 7200000).toISOString() },
@@ -85,29 +88,56 @@ export default function Dashboard() {
 
   const s = stats ?? demoStats;
 
-  const demoMarket = [
+  const demoTickers = [
     { symbol: "BTC/USDT", price: 67342.5, change24h: 1824.3, changePct24h: 2.78, volume24h: 28450000000, high24h: 68100.0, low24h: 65200.0 },
     { symbol: "ETH/USDT", price: 3521.8, change24h: -87.4, changePct24h: -2.42, volume24h: 12300000000, high24h: 3650.0, low24h: 3480.0 },
     { symbol: "SOL/USDT", price: 182.45, change24h: 9.32, changePct24h: 5.38, volume24h: 3200000000, high24h: 188.0, low24h: 172.0 },
     { symbol: "BNB/USDT", price: 598.2, change24h: -12.4, changePct24h: -2.03, volume24h: 1800000000, high24h: 615.0, low24h: 590.0 },
   ];
 
-  const m = market ?? demoMarket;
+  const tickers = market?.data ?? demoTickers;
+  const marketSource = market?.source;
+  const marketLastUpdated = market?.lastUpdated;
+
+  const modeLabel = systemMode === "live" ? "真實交易" : "模擬模式";
+  const modeBg = systemMode === "live" ? "bg-red-500/10 border-red-500/40 text-red-400" : "bg-primary/10 border-primary/40 text-primary";
+  const modeDot = systemMode === "live" ? "bg-red-400" : "bg-primary";
 
   return (
     <div className="flex flex-col">
-      <MarketTicker />
+      <MarketTicker tickers={tickers} />
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-foreground">系統儀表板</h1>
             <p className="text-xs text-muted-foreground mt-0.5">加密貨幣量化交易研究平台</p>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-medium text-primary">模擬模式</span>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${modeBg}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${modeDot} animate-pulse`} />
+            <span className="text-xs font-medium">{modeLabel}</span>
           </div>
         </div>
+
+        <div className="flex items-center gap-4 p-3 rounded-lg bg-card border border-border">
+          <div className="flex items-center gap-2">
+            {isConnected
+              ? <Wifi size={14} className="text-emerald-400" />
+              : <WifiOff size={14} className="text-muted-foreground" />}
+            <span className="text-xs text-foreground">{isConnected ? `${exchStatus?.exchange ?? "Binance"} 已連線` : "交易所未連線"}</span>
+          </div>
+          <div className="ml-auto">
+            <DataSourceBadge source={marketSource} lastUpdated={marketLastUpdated} />
+          </div>
+        </div>
+
+        {systemMode === "live" && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-red-950/40 border-2 border-red-500/60">
+            <AlertTriangle size={16} className="text-red-400 flex-shrink-0" />
+            <p className="text-xs text-red-300 font-semibold">
+              ⚠️ 真實交易模式已啟用 — 所有訂單將使用真實資金。本系統不提供任何投資建議。
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="策略數量" value={String(s.totalStrategies)} sub={`${s.activeStrategies} 個執行中`} icon={Layers} />
@@ -124,22 +154,25 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 bg-card border border-border rounded-lg p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-4">市場行情</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-foreground">市場行情</h2>
+              <DataSourceBadge source={marketSource} lastUpdated={marketLastUpdated} />
+            </div>
             <div className="space-y-2">
-              {m.map((ticker) => (
-                <div key={ticker.symbol} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0" data-testid={`ticker-${ticker.symbol}`}>
+              {tickers.map((ticker) => (
+                <div key={ticker.symbol} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary">
                       {ticker.symbol.split("/")[0][0]}
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-foreground">{ticker.symbol}</p>
-                      <p className="text-xs text-muted-foreground">24h 成交量 ${(ticker.volume24h / 1e9).toFixed(1)}B</p>
+                      <p className="text-xs text-muted-foreground">24h 成交量 ${((ticker.volume24h ?? 0) / 1e9).toFixed(1)}B</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-mono font-semibold text-foreground">
-                      ${ticker.price < 1 ? ticker.price.toFixed(4) : ticker.price.toLocaleString()}
+                      ${!ticker.price ? "—" : ticker.price < 1 ? ticker.price.toFixed(4) : ticker.price.toLocaleString()}
                     </p>
                     <p className={`text-xs font-mono flex items-center justify-end gap-0.5 ${ticker.changePct24h >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                       {ticker.changePct24h >= 0 ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
@@ -155,7 +188,7 @@ export default function Dashboard() {
             <h2 className="text-sm font-semibold text-foreground mb-4">最新動態</h2>
             <div className="space-y-3">
               {s.recentActivity.map((item) => (
-                <div key={item.id} className="flex items-start gap-3" data-testid={`activity-${item.id}`}>
+                <div key={item.id} className="flex items-start gap-3">
                   <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
                     item.type === "backtest" ? "bg-primary" :
                     item.type === "trade" ? "bg-emerald-400" :

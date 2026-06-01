@@ -8,21 +8,15 @@ servers:
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: strategies
-    description: Strategy management
   - name: backtests
-    description: Backtest operations
   - name: paper-trading
-    description: Paper trading simulation
   - name: risk
-    description: Risk management settings
   - name: trades
-    description: Trade records
   - name: market
-    description: Market data (demo)
   - name: settings
-    description: System settings
+  - name: exchange
+  - name: audit-logs
 
 paths:
   /healthz:
@@ -302,16 +296,14 @@ paths:
     get:
       operationId: getMarketSummary
       tags: [market]
-      summary: Get demo market data summary for popular pairs
+      summary: Get market data (real Binance if connected, else demo)
       responses:
         "200":
-          description: Market summary
+          description: Market summary with source info
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/MarketTicker"
+                $ref: "#/components/schemas/MarketSummaryResponse"
 
   /dashboard/stats:
     get:
@@ -356,6 +348,224 @@ paths:
               schema:
                 $ref: "#/components/schemas/SystemSettings"
 
+  /exchange/status:
+    get:
+      operationId: getExchangeStatus
+      tags: [exchange]
+      summary: Get exchange connection status
+      responses:
+        "200":
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeStatus"
+
+  /exchange/config:
+    post:
+      operationId: saveExchangeConfig
+      tags: [exchange]
+      summary: Save API keys (server-side only, never returned)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExchangeConfigInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleSuccess"
+
+  /exchange/test-connection:
+    post:
+      operationId: testExchangeConnection
+      tags: [exchange]
+      summary: Test API key connectivity
+      responses:
+        "200":
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResult"
+
+  /exchange/account:
+    get:
+      operationId: getExchangeAccount
+      tags: [exchange]
+      summary: Get real account balances
+      responses:
+        "200":
+          description: Account info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeAccount"
+
+  /exchange/pairs:
+    get:
+      operationId: getExchangePairs
+      tags: [exchange]
+      summary: Get available trading pairs with precision info
+      responses:
+        "200":
+          description: Trading pairs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TradingPair"
+
+  /exchange/klines:
+    get:
+      operationId: getKlines
+      tags: [exchange]
+      summary: Get OHLCV kline data
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: interval
+          in: query
+          schema:
+            type: string
+            default: "1h"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Kline data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KlineResponse"
+
+  /exchange/place-order:
+    post:
+      operationId: placeOrder
+      tags: [exchange]
+      summary: Place an order (paper/testnet/live)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaceOrderInput"
+      responses:
+        "200":
+          description: Order result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaceOrderResult"
+
+  /exchange/orders:
+    get:
+      operationId: getExchangeOrders
+      tags: [exchange]
+      summary: List open orders from exchange
+      parameters:
+        - name: symbol
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Open orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExchangeOrder"
+
+  /exchange/orders/{orderId}:
+    delete:
+      operationId: cancelExchangeOrder
+      tags: [exchange]
+      summary: Cancel an open order
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleSuccess"
+
+  /exchange/enable-live:
+    post:
+      operationId: enableLiveTrading
+      tags: [exchange]
+      summary: Enable live trading after all safety checks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnableLiveInput"
+      responses:
+        "200":
+          description: Live trading enabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleSuccess"
+
+  /exchange/disable-live:
+    post:
+      operationId: disableLiveTrading
+      tags: [exchange]
+      summary: Disable live trading, revert to paper mode
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimpleSuccess"
+
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit-logs]
+      summary: List audit log entries
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+
 components:
   schemas:
     HealthStatus:
@@ -363,8 +573,7 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     Strategy:
       type: object
@@ -601,7 +810,7 @@ components:
 
     RiskSettings:
       type: object
-      required: [id, maxPositionSizePct, maxDailyLossPct, maxLeverage, maxOpenPositions, stopLossPct, takeProfitPct, trailingStopPct, trailingStopEnabled, emergencyStopEnabled, updatedAt]
+      required: [id, maxPositionSizePct, maxDailyLossPct, maxLeverage, maxOpenPositions, stopLossPct, takeProfitPct, trailingStopPct, trailingStopEnabled, emergencyStopEnabled, maxSingleOrderUsdt, maxTotalExposureUsdt, maxConsecutiveLosses, allowedSymbols, updatedAt]
       properties:
         id:
           type: integer
@@ -623,6 +832,16 @@ components:
           type: boolean
         emergencyStopEnabled:
           type: boolean
+        maxSingleOrderUsdt:
+          type: number
+        maxTotalExposureUsdt:
+          type: number
+        maxConsecutiveLosses:
+          type: integer
+        allowedSymbols:
+          type: array
+          items:
+            type: string
         updatedAt:
           type: string
 
@@ -647,6 +866,16 @@ components:
           type: boolean
         emergencyStopEnabled:
           type: boolean
+        maxSingleOrderUsdt:
+          type: number
+        maxTotalExposureUsdt:
+          type: number
+        maxConsecutiveLosses:
+          type: integer
+        allowedSymbols:
+          type: array
+          items:
+            type: string
 
     EmergencyStopResult:
       type: object
@@ -686,7 +915,26 @@ components:
           type: string
         mode:
           type: string
-          enum: [paper, live]
+          enum: [paper, testnet, live]
+        orderSource:
+          type: string
+          enum: [manual, strategy]
+        exchangeOrderId:
+          type: ["string", "null"]
+
+    MarketSummaryResponse:
+      type: object
+      required: [source, lastUpdated, data]
+      properties:
+        source:
+          type: string
+          enum: [demo, binance_public, binance_testnet, binance_live]
+        lastUpdated:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/MarketTicker"
 
     MarketTicker:
       type: object
@@ -746,7 +994,7 @@ components:
 
     SystemSettings:
       type: object
-      required: [id, mode, exchangeName, apiKeySet, tradingEnabled, updatedAt]
+      required: [id, mode, exchangeName, networkMode, apiKeySet, tradingEnabled, liveReadyStep, connectionStatus, updatedAt]
       properties:
         id:
           type: integer
@@ -755,10 +1003,22 @@ components:
           enum: [paper, live]
         exchangeName:
           type: string
+        networkMode:
+          type: string
+          enum: [mainnet, testnet]
         apiKeySet:
           type: boolean
         tradingEnabled:
           type: boolean
+        liveReadyStep:
+          type: integer
+        connectionStatus:
+          type: string
+          enum: [disconnected, connecting, connected, error]
+        connectionError:
+          type: ["string", "null"]
+        lastConnectedAt:
+          type: ["string", "null"]
         updatedAt:
           type: string
 
@@ -769,4 +1029,278 @@ components:
           type: string
           enum: [paper, live]
         exchangeName:
+          type: string
+        networkMode:
+          type: string
+          enum: [mainnet, testnet]
+
+    ExchangeStatus:
+      type: object
+      required: [exchange, networkMode, isConnected, apiKeySet, systemMode, liveReadyStep, tradingEnabled]
+      properties:
+        exchange:
+          type: string
+        networkMode:
+          type: string
+        isConnected:
+          type: boolean
+        apiKeySet:
+          type: boolean
+        lastTestedAt:
+          type: ["string", "null"]
+        connectionError:
+          type: ["string", "null"]
+        systemMode:
+          type: string
+        liveReadyStep:
+          type: integer
+        tradingEnabled:
+          type: boolean
+
+    ExchangeConfigInput:
+      type: object
+      required: [apiKey, apiSecret]
+      properties:
+        apiKey:
+          type: string
+        apiSecret:
+          type: string
+        networkMode:
+          type: string
+          enum: [mainnet, testnet]
+          default: testnet
+        exchange:
+          type: string
+          default: Binance
+
+    ConnectionTestResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        canTrade:
+          type: boolean
+        canWithdraw:
+          type: boolean
+        accountType:
+          type: string
+        networkMode:
+          type: string
+        serverTime:
+          type: number
+        usdtBalance:
+          type: string
+        error:
+          type: string
+
+    ExchangeAccount:
+      type: object
+      required: [canTrade, canWithdraw, accountType, balances, networkMode, lastUpdated]
+      properties:
+        canTrade:
+          type: boolean
+        canWithdraw:
+          type: boolean
+        accountType:
+          type: string
+        networkMode:
+          type: string
+        lastUpdated:
+          type: string
+        balances:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssetBalance"
+
+    AssetBalance:
+      type: object
+      required: [asset, free, locked, total]
+      properties:
+        asset:
+          type: string
+        free:
+          type: number
+        locked:
+          type: number
+        total:
+          type: number
+
+    TradingPair:
+      type: object
+      required: [symbol, baseAsset, quoteAsset, minQty, maxQty, stepSize, tickSize, minNotional]
+      properties:
+        symbol:
+          type: string
+        baseAsset:
+          type: string
+        quoteAsset:
+          type: string
+        minQty:
+          type: string
+        maxQty:
+          type: string
+        stepSize:
+          type: string
+        tickSize:
+          type: string
+        minNotional:
+          type: string
+
+    KlineResponse:
+      type: object
+      required: [symbol, interval, source, data]
+      properties:
+        symbol:
+          type: string
+        interval:
+          type: string
+        source:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Kline"
+
+    Kline:
+      type: object
+      required: [time, open, high, low, close, volume]
+      properties:
+        time:
+          type: number
+        open:
+          type: number
+        high:
+          type: number
+        low:
+          type: number
+        close:
+          type: number
+        volume:
+          type: number
+
+    PlaceOrderInput:
+      type: object
+      required: [symbol, side, type, quantity]
+      properties:
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [BUY, SELL]
+        type:
+          type: string
+          enum: [MARKET, LIMIT]
+        quantity:
+          type: number
+        price:
+          type: number
+        source:
+          type: string
+          enum: [manual, strategy]
+          default: manual
+        strategyName:
+          type: string
+        confirmLive:
+          type: boolean
+
+    PlaceOrderResult:
+      type: object
+      required: [orderId, symbol, side, type, quantity, status, mode]
+      properties:
+        orderId:
+          type: integer
+        symbol:
+          type: string
+        side:
+          type: string
+        type:
+          type: string
+        quantity:
+          type: number
+        executedQty:
+          type: number
+        price:
+          type: number
+        status:
+          type: string
+        mode:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        message:
+          type: string
+        fills:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    ExchangeOrder:
+      type: object
+      required: [orderId, symbol, side, type, origQty, executedQty, price, status, time]
+      properties:
+        orderId:
+          type: integer
+        symbol:
+          type: string
+        side:
+          type: string
+        type:
+          type: string
+        origQty:
+          type: number
+        executedQty:
+          type: number
+        price:
+          type: number
+        status:
+          type: string
+        time:
+          type: string
+
+    EnableLiveInput:
+      type: object
+      required: [confirmText, riskAgreed, noWithdrawConfirmed]
+      properties:
+        confirmText:
+          type: string
+        riskAgreed:
+          type: boolean
+        noWithdrawConfirmed:
+          type: boolean
+
+    SimpleSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
+          type: string
+
+    AuditLog:
+      type: object
+      required: [id, action, mode, source, result, createdAt]
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        mode:
+          type: string
+        source:
+          type: string
+        result:
+          type: string
+        errorMessage:
+          type: ["string", "null"]
+        createdAt:
           type: string

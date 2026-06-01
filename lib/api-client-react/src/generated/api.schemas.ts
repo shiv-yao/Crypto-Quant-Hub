@@ -217,6 +217,10 @@ export interface RiskSettings {
   trailingStopPct: number;
   trailingStopEnabled: boolean;
   emergencyStopEnabled: boolean;
+  maxSingleOrderUsdt: number;
+  maxTotalExposureUsdt: number;
+  maxConsecutiveLosses: number;
+  allowedSymbols: string[];
   updatedAt: string;
 }
 
@@ -230,6 +234,10 @@ export interface RiskSettingsUpdate {
   trailingStopPct?: number;
   trailingStopEnabled?: boolean;
   emergencyStopEnabled?: boolean;
+  maxSingleOrderUsdt?: number;
+  maxTotalExposureUsdt?: number;
+  maxConsecutiveLosses?: number;
+  allowedSymbols?: string[];
 }
 
 export interface EmergencyStopResult {
@@ -251,7 +259,16 @@ export type TradeRecordMode = typeof TradeRecordMode[keyof typeof TradeRecordMod
 
 export const TradeRecordMode = {
   paper: 'paper',
+  testnet: 'testnet',
   live: 'live',
+} as const;
+
+export type TradeRecordOrderSource = typeof TradeRecordOrderSource[keyof typeof TradeRecordOrderSource];
+
+
+export const TradeRecordOrderSource = {
+  manual: 'manual',
+  strategy: 'strategy',
 } as const;
 
 export interface TradeRecord {
@@ -266,7 +283,20 @@ export interface TradeRecord {
   strategyName: string;
   executedAt: string;
   mode: TradeRecordMode;
+  orderSource?: TradeRecordOrderSource;
+  /** @nullable */
+  exchangeOrderId?: string | null;
 }
+
+export type MarketSummaryResponseSource = typeof MarketSummaryResponseSource[keyof typeof MarketSummaryResponseSource];
+
+
+export const MarketSummaryResponseSource = {
+  demo: 'demo',
+  binance_public: 'binance_public',
+  binance_testnet: 'binance_testnet',
+  binance_live: 'binance_live',
+} as const;
 
 export interface MarketTicker {
   symbol: string;
@@ -276,6 +306,12 @@ export interface MarketTicker {
   volume24h: number;
   high24h: number;
   low24h: number;
+}
+
+export interface MarketSummaryResponse {
+  source: MarketSummaryResponseSource;
+  lastUpdated: string;
+  data: MarketTicker[];
 }
 
 export type DashboardStatsSystemMode = typeof DashboardStatsSystemMode[keyof typeof DashboardStatsSystemMode];
@@ -312,12 +348,37 @@ export const SystemSettingsMode = {
   live: 'live',
 } as const;
 
+export type SystemSettingsNetworkMode = typeof SystemSettingsNetworkMode[keyof typeof SystemSettingsNetworkMode];
+
+
+export const SystemSettingsNetworkMode = {
+  mainnet: 'mainnet',
+  testnet: 'testnet',
+} as const;
+
+export type SystemSettingsConnectionStatus = typeof SystemSettingsConnectionStatus[keyof typeof SystemSettingsConnectionStatus];
+
+
+export const SystemSettingsConnectionStatus = {
+  disconnected: 'disconnected',
+  connecting: 'connecting',
+  connected: 'connected',
+  error: 'error',
+} as const;
+
 export interface SystemSettings {
   id: number;
   mode: SystemSettingsMode;
   exchangeName: string;
+  networkMode: SystemSettingsNetworkMode;
   apiKeySet: boolean;
   tradingEnabled: boolean;
+  liveReadyStep: number;
+  connectionStatus: SystemSettingsConnectionStatus;
+  /** @nullable */
+  connectionError?: string | null;
+  /** @nullable */
+  lastConnectedAt?: string | null;
   updatedAt: string;
 }
 
@@ -329,8 +390,208 @@ export const SystemSettingsUpdateMode = {
   live: 'live',
 } as const;
 
+export type SystemSettingsUpdateNetworkMode = typeof SystemSettingsUpdateNetworkMode[keyof typeof SystemSettingsUpdateNetworkMode];
+
+
+export const SystemSettingsUpdateNetworkMode = {
+  mainnet: 'mainnet',
+  testnet: 'testnet',
+} as const;
+
 export interface SystemSettingsUpdate {
   mode?: SystemSettingsUpdateMode;
   exchangeName?: string;
+  networkMode?: SystemSettingsUpdateNetworkMode;
 }
+
+export interface ExchangeStatus {
+  exchange: string;
+  networkMode: string;
+  isConnected: boolean;
+  apiKeySet: boolean;
+  /** @nullable */
+  lastTestedAt?: string | null;
+  /** @nullable */
+  connectionError?: string | null;
+  systemMode: string;
+  liveReadyStep: number;
+  tradingEnabled: boolean;
+}
+
+export type ExchangeConfigInputNetworkMode = typeof ExchangeConfigInputNetworkMode[keyof typeof ExchangeConfigInputNetworkMode];
+
+
+export const ExchangeConfigInputNetworkMode = {
+  mainnet: 'mainnet',
+  testnet: 'testnet',
+} as const;
+
+export interface ExchangeConfigInput {
+  apiKey: string;
+  apiSecret: string;
+  networkMode?: ExchangeConfigInputNetworkMode;
+  exchange?: string;
+}
+
+export interface ConnectionTestResult {
+  success: boolean;
+  canTrade?: boolean;
+  canWithdraw?: boolean;
+  accountType?: string;
+  networkMode?: string;
+  serverTime?: number;
+  usdtBalance?: string;
+  error?: string;
+}
+
+export interface AssetBalance {
+  asset: string;
+  free: number;
+  locked: number;
+  total: number;
+}
+
+export interface ExchangeAccount {
+  canTrade: boolean;
+  canWithdraw: boolean;
+  accountType: string;
+  networkMode: string;
+  lastUpdated: string;
+  balances: AssetBalance[];
+}
+
+export interface TradingPair {
+  symbol: string;
+  baseAsset: string;
+  quoteAsset: string;
+  minQty: string;
+  maxQty: string;
+  stepSize: string;
+  tickSize: string;
+  minNotional: string;
+}
+
+export interface Kline {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface KlineResponse {
+  symbol: string;
+  interval: string;
+  source: string;
+  data: Kline[];
+}
+
+export type PlaceOrderInputSide = typeof PlaceOrderInputSide[keyof typeof PlaceOrderInputSide];
+
+
+export const PlaceOrderInputSide = {
+  BUY: 'BUY',
+  SELL: 'SELL',
+} as const;
+
+export type PlaceOrderInputType = typeof PlaceOrderInputType[keyof typeof PlaceOrderInputType];
+
+
+export const PlaceOrderInputType = {
+  MARKET: 'MARKET',
+  LIMIT: 'LIMIT',
+} as const;
+
+export type PlaceOrderInputSource = typeof PlaceOrderInputSource[keyof typeof PlaceOrderInputSource];
+
+
+export const PlaceOrderInputSource = {
+  manual: 'manual',
+  strategy: 'strategy',
+} as const;
+
+export interface PlaceOrderInput {
+  symbol: string;
+  side: PlaceOrderInputSide;
+  type: PlaceOrderInputType;
+  quantity: number;
+  price?: number;
+  source?: PlaceOrderInputSource;
+  strategyName?: string;
+  confirmLive?: boolean;
+}
+
+export type PlaceOrderResultFillsItem = { [key: string]: unknown };
+
+export interface PlaceOrderResult {
+  orderId: number;
+  symbol: string;
+  side: string;
+  type: string;
+  quantity: number;
+  executedQty?: number;
+  price?: number;
+  status: string;
+  mode: string;
+  warnings?: string[];
+  message?: string;
+  fills?: PlaceOrderResultFillsItem[];
+}
+
+export interface ExchangeOrder {
+  orderId: number;
+  symbol: string;
+  side: string;
+  type: string;
+  origQty: number;
+  executedQty: number;
+  price: number;
+  status: string;
+  time: string;
+}
+
+export interface EnableLiveInput {
+  confirmText: string;
+  riskAgreed: boolean;
+  noWithdrawConfirmed: boolean;
+}
+
+export interface SimpleSuccess {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
+
+export type AuditLogDetails = { [key: string]: unknown };
+
+export interface AuditLog {
+  id: number;
+  action: string;
+  details?: AuditLogDetails;
+  mode: string;
+  source: string;
+  result: string;
+  /** @nullable */
+  errorMessage?: string | null;
+  createdAt: string;
+}
+
+export type GetKlinesParams = {
+symbol: string;
+interval?: string;
+limit?: number;
+};
+
+export type GetExchangeOrdersParams = {
+symbol?: string;
+};
+
+export type CancelExchangeOrderParams = {
+symbol: string;
+};
+
+export type ListAuditLogsParams = {
+limit?: number;
+};
 
