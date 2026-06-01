@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, Activity, BarChart2, Layers, AlertTriangle, A
 
 const SOURCE_LABELS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   bitget_public_mainnet: { label: "Bitget 主網即時行情", color: "text-emerald-400", icon: Radio },
+  okx_public_mainnet: { label: "OKX 主網即時行情", color: "text-emerald-400", icon: Radio },
   unavailable: { label: "行情暫時無法取得", color: "text-red-400", icon: WifiOff },
 };
 
@@ -24,7 +25,7 @@ function MarketTicker({ tickers }: { tickers: Array<{ symbol: string; price: num
   if (tickers.length === 0) {
     return (
       <div className="border-b border-border bg-card/50 px-4 py-2 text-xs text-red-400">
-        Bitget 公開主網行情暫時無法取得
+        公開主網行情暫時無法取得
       </div>
     );
   }
@@ -81,7 +82,8 @@ export default function Dashboard() {
   const tickers = market?.data ?? [];
   const marketSource = market?.source ?? "unavailable";
   const marketLastUpdated = market?.lastUpdated;
-  const isMarketConnected = marketSource === "bitget_public_mainnet" && tickers.length > 0;
+  const isMarketConnected = ["bitget_public_mainnet", "okx_public_mainnet"].includes(marketSource) && tickers.length > 0;
+  const providerLabel = marketSource === "okx_public_mainnet" ? "OKX" : "Bitget";
 
   const s = stats ?? {
     totalStrategies: 0,
@@ -105,7 +107,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-foreground">系統儀表板</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Bitget 真實行情 · 量化交易研究平台</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{providerLabel} 真實行情 · 量化交易研究平台</p>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border ${modeBg}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${modeDot} animate-pulse`} />
@@ -119,7 +121,7 @@ export default function Dashboard() {
               ? <Wifi size={14} className="text-emerald-400" />
               : <WifiOff size={14} className="text-red-400" />}
             <span className="text-xs text-foreground">
-              {isMarketConnected ? "Bitget 公開主網行情已連線" : "Bitget 行情暫時無法取得"}
+              {isMarketConnected ? `${providerLabel} 公開主網行情已連線` : "公開行情暫時無法取得"}
             </span>
           </div>
           <div className="ml-auto">
@@ -156,7 +158,7 @@ export default function Dashboard() {
               <DataSourceBadge source={marketSource} lastUpdated={marketLastUpdated} />
             </div>
             {tickers.length === 0 ? (
-              <p className="text-xs text-red-400">Bitget 公開主網行情暫時無法取得，請稍後重新整理。</p>
+              <p className="text-xs text-red-400">公開主網行情暫時無法取得，請稍後重新整理。</p>
             ) : (
               <div className="space-y-2">
                 {tickers.map((ticker) => (
