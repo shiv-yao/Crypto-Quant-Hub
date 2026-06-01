@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "加密貨幣量化交易系統"
+version = "1.0.0"
+id = "artifacts/crypto-quant"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18728
+
+[services.development]
+run = "pnpm --filter @workspace/crypto-quant run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/crypto-quant", "run", "build" ]
+publicDir = "artifacts/crypto-quant/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18728"
+BASE_PATH = "/"

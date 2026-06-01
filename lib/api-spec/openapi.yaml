@@ -1,22 +1,35 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Crypto Quant Trading System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: strategies
+    description: Strategy management
+  - name: backtests
+    description: Backtest operations
+  - name: paper-trading
+    description: Paper trading simulation
+  - name: risk
+    description: Risk management settings
+  - name: trades
+    description: Trade records
+  - name: market
+    description: Market data (demo)
+  - name: settings
+    description: System settings
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +37,325 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /strategies:
+    get:
+      operationId: listStrategies
+      tags: [strategies]
+      summary: List all strategies
+      responses:
+        "200":
+          description: List of strategies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Strategy"
+    post:
+      operationId: createStrategy
+      tags: [strategies]
+      summary: Create a new strategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+
+  /strategies/{id}:
+    get:
+      operationId: getStrategy
+      tags: [strategies]
+      summary: Get a strategy by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Strategy details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateStrategy
+      tags: [strategies]
+      summary: Update a strategy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrategyUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strategy"
+    delete:
+      operationId: deleteStrategy
+      tags: [strategies]
+      summary: Delete a strategy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /backtests:
+    get:
+      operationId: listBacktests
+      tags: [backtests]
+      summary: List all backtest results
+      responses:
+        "200":
+          description: List of backtest results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BacktestResult"
+    post:
+      operationId: runBacktest
+      tags: [backtests]
+      summary: Run a backtest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BacktestInput"
+      responses:
+        "201":
+          description: Backtest result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestResult"
+
+  /backtests/{id}:
+    get:
+      operationId: getBacktest
+      tags: [backtests]
+      summary: Get backtest result by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Backtest detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BacktestResult"
+
+  /paper-trading/positions:
+    get:
+      operationId: listPositions
+      tags: [paper-trading]
+      summary: List current paper trading positions
+      responses:
+        "200":
+          description: Positions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Position"
+
+  /paper-trading/orders:
+    get:
+      operationId: listOrders
+      tags: [paper-trading]
+      summary: List paper trading orders
+      responses:
+        "200":
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+  /paper-trading/summary:
+    get:
+      operationId: getPaperTradingSummary
+      tags: [paper-trading]
+      summary: Get paper trading account summary
+      responses:
+        "200":
+          description: Account summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaperTradingSummary"
+
+  /paper-trading/strategies/{id}/toggle:
+    post:
+      operationId: toggleStrategyExecution
+      tags: [paper-trading]
+      summary: Pause or resume a running strategy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated execution status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrategyExecution"
+
+  /risk:
+    get:
+      operationId: getRiskSettings
+      tags: [risk]
+      summary: Get current risk management settings
+      responses:
+        "200":
+          description: Risk settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskSettings"
+    patch:
+      operationId: updateRiskSettings
+      tags: [risk]
+      summary: Update risk management settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiskSettingsUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiskSettings"
+
+  /risk/emergency-stop:
+    post:
+      operationId: triggerEmergencyStop
+      tags: [risk]
+      summary: Trigger emergency stop - halt all strategies
+      responses:
+        "200":
+          description: Emergency stop triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmergencyStopResult"
+
+  /trades:
+    get:
+      operationId: listTrades
+      tags: [trades]
+      summary: List trade history records
+      responses:
+        "200":
+          description: Trade records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TradeRecord"
+
+  /market/summary:
+    get:
+      operationId: getMarketSummary
+      tags: [market]
+      summary: Get demo market data summary for popular pairs
+      responses:
+        "200":
+          description: Market summary
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MarketTicker"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [market]
+      summary: Get dashboard overview statistics
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get system settings
+      responses:
+        "200":
+          description: System settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update system settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SystemSettingsUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemSettings"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +366,407 @@ components:
       required:
         - status
 
+    Strategy:
+      type: object
+      required: [id, name, type, symbol, interval, params, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [ma_crossover, rsi, bollinger, grid]
+        symbol:
+          type: string
+        interval:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    StrategyInput:
+      type: object
+      required: [name, type, symbol, interval, params]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [ma_crossover, rsi, bollinger, grid]
+        symbol:
+          type: string
+        interval:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        description:
+          type: string
+
+    StrategyUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        symbol:
+          type: string
+        interval:
+          type: string
+        params:
+          type: object
+          additionalProperties: true
+        isActive:
+          type: boolean
+        description:
+          type: string
+
+    BacktestResult:
+      type: object
+      required: [id, strategyId, strategyName, symbol, interval, startDate, endDate, initialCapital, finalCapital, totalReturn, annualizedReturn, maxDrawdown, winRate, profitFactor, totalTrades, status, createdAt]
+      properties:
+        id:
+          type: integer
+        strategyId:
+          type: integer
+        strategyName:
+          type: string
+        symbol:
+          type: string
+        interval:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        initialCapital:
+          type: number
+        finalCapital:
+          type: number
+        totalReturn:
+          type: number
+        annualizedReturn:
+          type: number
+        maxDrawdown:
+          type: number
+        winRate:
+          type: number
+        profitFactor:
+          type: number
+        totalTrades:
+          type: integer
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        equityCurve:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/EquityPoint"
+        trades:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/BacktestTrade"
+        createdAt:
+          type: string
+
+    BacktestInput:
+      type: object
+      required: [strategyId, startDate, endDate, initialCapital]
+      properties:
+        strategyId:
+          type: integer
+        startDate:
+          type: string
+        endDate:
+          type: string
+        initialCapital:
+          type: number
+
+    EquityPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date:
+          type: string
+        value:
+          type: number
+
+    BacktestTrade:
+      type: object
+      required: [id, side, entryPrice, exitPrice, entryDate, exitDate, pnl, pnlPct]
+      properties:
+        id:
+          type: integer
+        side:
+          type: string
+          enum: [long, short]
+        entryPrice:
+          type: number
+        exitPrice:
+          type: number
+        entryDate:
+          type: string
+        exitDate:
+          type: string
+        pnl:
+          type: number
+        pnlPct:
+          type: number
+
+    Position:
+      type: object
+      required: [id, symbol, side, size, entryPrice, currentPrice, unrealizedPnl, unrealizedPnlPct, strategyName, openedAt]
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [long, short]
+        size:
+          type: number
+        entryPrice:
+          type: number
+        currentPrice:
+          type: number
+        unrealizedPnl:
+          type: number
+        unrealizedPnlPct:
+          type: number
+        strategyName:
+          type: string
+        openedAt:
+          type: string
+
+    Order:
+      type: object
+      required: [id, symbol, side, type, size, price, status, strategyName, createdAt]
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        type:
+          type: string
+          enum: [market, limit, stop]
+        size:
+          type: number
+        price:
+          type: number
+        status:
+          type: string
+          enum: [pending, filled, cancelled, rejected]
+        strategyName:
+          type: string
+        createdAt:
+          type: string
+
+    PaperTradingSummary:
+      type: object
+      required: [totalEquity, availableBalance, totalUnrealizedPnl, totalRealizedPnl, totalTrades, winRate, activeStrategies]
+      properties:
+        totalEquity:
+          type: number
+        availableBalance:
+          type: number
+        totalUnrealizedPnl:
+          type: number
+        totalRealizedPnl:
+          type: number
+        totalTrades:
+          type: integer
+        winRate:
+          type: number
+        activeStrategies:
+          type: integer
+
+    StrategyExecution:
+      type: object
+      required: [strategyId, isRunning]
+      properties:
+        strategyId:
+          type: integer
+        isRunning:
+          type: boolean
+
+    RiskSettings:
+      type: object
+      required: [id, maxPositionSizePct, maxDailyLossPct, maxLeverage, maxOpenPositions, stopLossPct, takeProfitPct, trailingStopPct, trailingStopEnabled, emergencyStopEnabled, updatedAt]
+      properties:
+        id:
+          type: integer
+        maxPositionSizePct:
+          type: number
+        maxDailyLossPct:
+          type: number
+        maxLeverage:
+          type: number
+        maxOpenPositions:
+          type: integer
+        stopLossPct:
+          type: number
+        takeProfitPct:
+          type: number
+        trailingStopPct:
+          type: number
+        trailingStopEnabled:
+          type: boolean
+        emergencyStopEnabled:
+          type: boolean
+        updatedAt:
+          type: string
+
+    RiskSettingsUpdate:
+      type: object
+      properties:
+        maxPositionSizePct:
+          type: number
+        maxDailyLossPct:
+          type: number
+        maxLeverage:
+          type: number
+        maxOpenPositions:
+          type: integer
+        stopLossPct:
+          type: number
+        takeProfitPct:
+          type: number
+        trailingStopPct:
+          type: number
+        trailingStopEnabled:
+          type: boolean
+        emergencyStopEnabled:
+          type: boolean
+
+    EmergencyStopResult:
+      type: object
+      required: [success, stoppedStrategies, message]
+      properties:
+        success:
+          type: boolean
+        stoppedStrategies:
+          type: integer
+        message:
+          type: string
+
+    TradeRecord:
+      type: object
+      required: [id, symbol, side, size, price, fee, pnl, pnlPct, strategyName, executedAt, mode]
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        side:
+          type: string
+          enum: [buy, sell]
+        size:
+          type: number
+        price:
+          type: number
+        fee:
+          type: number
+        pnl:
+          type: number
+        pnlPct:
+          type: number
+        strategyName:
+          type: string
+        executedAt:
+          type: string
+        mode:
+          type: string
+          enum: [paper, live]
+
+    MarketTicker:
+      type: object
+      required: [symbol, price, change24h, changePct24h, volume24h, high24h, low24h]
+      properties:
+        symbol:
+          type: string
+        price:
+          type: number
+        change24h:
+          type: number
+        changePct24h:
+          type: number
+        volume24h:
+          type: number
+        high24h:
+          type: number
+        low24h:
+          type: number
+
+    DashboardStats:
+      type: object
+      required: [totalStrategies, activeStrategies, totalBacktests, totalTrades, paperTradingPnl, paperTradingPnlPct, systemMode, recentActivity]
+      properties:
+        totalStrategies:
+          type: integer
+        activeStrategies:
+          type: integer
+        totalBacktests:
+          type: integer
+        totalTrades:
+          type: integer
+        paperTradingPnl:
+          type: number
+        paperTradingPnlPct:
+          type: number
+        systemMode:
+          type: string
+          enum: [paper, live]
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+
+    ActivityItem:
+      type: object
+      required: [id, type, description, timestamp]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        timestamp:
+          type: string
+
+    SystemSettings:
+      type: object
+      required: [id, mode, exchangeName, apiKeySet, tradingEnabled, updatedAt]
+      properties:
+        id:
+          type: integer
+        mode:
+          type: string
+          enum: [paper, live]
+        exchangeName:
+          type: string
+        apiKeySet:
+          type: boolean
+        tradingEnabled:
+          type: boolean
+        updatedAt:
+          type: string
+
+    SystemSettingsUpdate:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [paper, live]
+        exchangeName:
+          type: string
