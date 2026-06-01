@@ -17,11 +17,12 @@ import Bitget from "@/pages/bitget";
 import Okx from "@/pages/okx";
 import AutoTrading from "@/pages/auto-trading";
 import OkxSwapAi from "@/pages/okx-swap-ai";
+import OkxShadowLearning from "@/pages/okx-shadow-learning";
 import AuditLogs from "@/pages/audit-logs";
 import {
   LayoutDashboard, Layers, BarChart2, Activity, ShieldAlert, List,
   Settings as SettingsIcon, Menu, X, TrendingUp, CandlestickChart, FileText,
-  AlertTriangle, Wifi, Radio, Bot
+  AlertTriangle, Wifi, Radio, Bot, Microscope
 } from "lucide-react";
 import { useState } from "react";
 import { useGetExchangeStatus } from "@workspace/api-client-react";
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { path: "/", label: "儀表板", icon: LayoutDashboard },
   { path: "/auto-trading", label: "自動交易", icon: Bot },
   { path: "/okx-swap-ai", label: "OKX 合約 AI", icon: Bot },
+  { path: "/okx-shadow-learning", label: "Shadow Learning", icon: Microscope },
   { path: "/strategies", label: "策略管理", icon: Layers },
   { path: "/backtests", label: "回測", icon: BarChart2 },
   { path: "/paper-trading", label: "模擬交易", icon: Activity },
@@ -189,6 +191,7 @@ function Router() {
         <Route path="/" component={Dashboard} />
         <Route path="/auto-trading" component={AutoTrading} />
         <Route path="/okx-swap-ai" component={OkxSwapAi} />
+        <Route path="/okx-shadow-learning" component={OkxShadowLearning} />
         <Route path="/strategies/new" component={NewStrategy} />
         <Route path="/strategies" component={Strategies} />
         <Route path="/backtests/:id" component={BacktestDetail} />
