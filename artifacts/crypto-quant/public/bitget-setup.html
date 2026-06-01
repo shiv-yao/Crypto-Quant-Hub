@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bitget API 設定與測試</title>
+  <style>
+    :root { color-scheme: dark; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #08111f; color: #e5edf8; }
+    main { max-width: 780px; margin: 0 auto; padding: 20px; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    h2 { margin: 0 0 12px; font-size: 17px; }
+    p { line-height: 1.6; color: #9fb0c5; }
+    code { word-break: break-all; color: #93c5fd; }
+    .card { margin-top: 16px; padding: 16px; border: 1px solid #243247; border-radius: 14px; background: #0d1728; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    button, input, select { width: 100%; box-sizing: border-box; border-radius: 10px; border: 1px solid #334155; background: #101d31; color: #e5edf8; padding: 11px; font-size: 14px; }
+    button { cursor: pointer; border-color: #2563eb; background: #1d4ed8; font-weight: 700; }
+    button.secondary { background: #172554; }
+    button.danger { border-color: #b91c1c; background: #7f1d1d; }
+    label { display: block; color: #b7c5d8; margin: 10px 0 6px; font-size: 13px; }
+    pre { white-space: pre-wrap; word-break: break-word; padding: 12px; border-radius: 10px; background: #07101d; color: #cbd5e1; overflow: auto; font-size: 12px; }
+    .ok { color: #34d399; }
+    .warn { color: #fbbf24; }
+    .error { color: #f87171; }
+    .note { padding: 12px; border-left: 4px solid #f59e0b; background: #1f1a0d; border-radius: 8px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Bitget API 設定與測試</h1>
+  <p>Bitget 憑證只放在 Railway Variables。此頁不會接收、顯示或儲存 API Key。</p>
+
+  <section class="card">
+    <h2>Railway Variables</h2>
+    <p>請在 <strong>Crypto-Quant-Hub → Variables</strong> 新增：</p>
+    <pre>BITGET_API_KEY=你的 Bitget API Key
+BITGET_API_SECRET=你的 Bitget Secret
+BITGET_API_PASSPHRASE=建立 API 時設定的 Passphrase
+BITGET_NETWORK_MODE=testnet</pre>
+    <p class="warn">先使用 <code>testnet</code>。本頁只提供 Demo Trading 下單，不開放主網真實下單。</p>
+  </section>
+
+  <section class="card">
+    <h2>狀態</h2>
+    <div class="grid">
+      <button onclick="loadStatus()">重新整理狀態</button>
+      <button class="secondary" onclick="loadSummary()">讀取公開行情</button>
+      <button class="secondary" onclick="testConnection()">測試 Bitget 連線</button>
+      <button class="secondary" onclick="loadAccount()">查看帳戶資產</button>
+    </div>
+    <pre id="status">尚未查詢</pre>
+  </section>
+
+  <section class="card">
+    <h2>Bitget Demo 下單</h2>
+    <div class="note">市價買入時，Bitget 的數量欄位代表報價幣金額，例如 BTC/USDT 的市價買入數量填 10 代表使用 10 USDT。限價單與市價賣出則是基礎幣數量。</div>
+    <label>交易對</label>
+    <select id="symbol">
+      <option>BTC/USDT</option>
+      <option>ETH/USDT</option>
+      <option>SOL/USDT</option>
+    </select>
+    <label>方向</label>
+    <select id="side">
+      <option value="BUY">買入 BUY</option>
+      <option value="SELL">賣出 SELL</option>
+    </select>
+    <label>訂單類型</label>
+    <select id="type" onchange="togglePrice()">
+      <option value="MARKET">市價 MARKET</option>
+      <option value="LIMIT">限價 LIMIT</option>
+    </select>
+    <label>數量</label>
+    <input id="quantity" placeholder="例如：10" />
+    <div id="priceWrap" style="display:none">
+      <label>限價</label>
+      <input id="price" placeholder="例如：60000" />
+    </div>
+    <label><input id="confirmDemo" type="checkbox" style="width:auto" /> 我確認這是 Bitget Demo Trading 測試訂單</label>
+    <button class="danger" onclick="placeDemoOrder()">送出 Demo 訂單</button>
+    <pre id="orderResult">尚未送出</pre>
+  </section>
+
+  <section class="card">
+    <h2>API 路徑</h2>
+    <pre>GET  /api/bitget/status
+GET  /api/bitget/summary
+POST /api/bitget/test-connection
+GET  /api/bitget/account
+GET  /api/bitget/klines?symbol=BTC/USDT&interval=1h
+POST /api/bitget/demo-order</pre>
+  </section>
+</main>
+<script>
+  const statusEl = document.getElementById('status');
+  const orderEl = document.getElementById('orderResult');
+  const format = (data) => JSON.stringify(data, null, 2);
+
+  async function request(url, options = {}) {
+    const response = await fetch(url, options);
+    const data = await response.json().catch(() => ({ error: '回傳格式不是 JSON' }));
+    if (!response.ok) throw new Error(format(data));
+    return data;
+  }
+
+  async function loadStatus() {
+    statusEl.textContent = '讀取中...';
+    try { statusEl.textContent = format(await request('/api/bitget/status')); }
+    catch (error) { statusEl.textContent = String(error); }
+  }
+
+  async function loadSummary() {
+    statusEl.textContent = '讀取中...';
+    try { statusEl.textContent = format(await request('/api/bitget/summary')); }
+    catch (error) { statusEl.textContent = String(error); }
+  }
+
+  async function testConnection() {
+    statusEl.textContent = '測試連線中...';
+    try { statusEl.textContent = format(await request('/api/bitget/test-connection', { method: 'POST' })); }
+    catch (error) { statusEl.textContent = String(error); }
+  }
+
+  async function loadAccount() {
+    statusEl.textContent = '讀取資產中...';
+    try { statusEl.textContent = format(await request('/api/bitget/account')); }
+    catch (error) { statusEl.textContent = String(error); }
+  }
+
+  function togglePrice() {
+    document.getElementById('priceWrap').style.display = document.getElementById('type').value === 'LIMIT' ? 'block' : 'none';
+  }
+
+  async function placeDemoOrder() {
+    orderEl.textContent = '送出中...';
+    const payload = {
+      symbol: document.getElementById('symbol').value,
+      side: document.getElementById('side').value,
+      type: document.getElementById('type').value,
+      quantity: document.getElementById('quantity').value,
+      price: document.getElementById('price').value || undefined,
+      confirmDemo: document.getElementById('confirmDemo').checked,
+    };
+    try {
+      orderEl.textContent = format(await request('/api/bitget/demo-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }));
+    } catch (error) {
+      orderEl.textContent = String(error);
+    }
+  }
+
+  loadStatus();
+</script>
+</body>
+</html>
