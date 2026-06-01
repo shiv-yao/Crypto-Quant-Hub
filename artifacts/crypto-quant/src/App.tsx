@@ -13,11 +13,12 @@ import Risk from "@/pages/risk";
 import Trades from "@/pages/trades";
 import Settings from "@/pages/settings";
 import Trading from "@/pages/trading";
+import Bitget from "@/pages/bitget";
 import AuditLogs from "@/pages/audit-logs";
 import {
   LayoutDashboard, Layers, BarChart2, Activity, ShieldAlert, List,
   Settings as SettingsIcon, Menu, X, TrendingUp, CandlestickChart, FileText,
-  AlertTriangle, Wifi, WifiOff
+  AlertTriangle, Wifi, Radio
 } from "lucide-react";
 import { useState } from "react";
 import { useGetExchangeStatus } from "@workspace/api-client-react";
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { path: "/backtests", label: "回測", icon: BarChart2 },
   { path: "/paper-trading", label: "模擬交易", icon: Activity },
   { path: "/trading", label: "手動交易", icon: CandlestickChart },
+  { path: "/bitget", label: "Bitget API", icon: Radio },
   { path: "/risk", label: "風險管理", icon: ShieldAlert },
   { path: "/trades", label: "交易紀錄", icon: List },
   { path: "/audit-logs", label: "稽核紀錄", icon: FileText },
@@ -136,7 +138,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
           ) : (
             <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <p className="text-xs text-amber-400 leading-relaxed">本系統僅供研究與模擬，不構成投資建議</p>
+              <p className="text-xs text-amber-400 leading-relaxed">行情使用 Bitget 真實公開數據；下單預設為 Demo Trading</p>
             </div>
           )}
         </div>
@@ -185,6 +187,7 @@ function Router() {
         <Route path="/backtests" component={Backtests} />
         <Route path="/paper-trading" component={PaperTrading} />
         <Route path="/trading" component={Trading} />
+        <Route path="/bitget" component={Bitget} />
         <Route path="/risk" component={Risk} />
         <Route path="/trades" component={Trades} />
         <Route path="/audit-logs" component={AuditLogs} />
