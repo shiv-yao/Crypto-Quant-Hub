@@ -22,79 +22,51 @@ let lastRealFetch = 0;
 let cachedRealData: typeof DEMO_MARKET_DATA | null = null;
 const CACHE_TTL = 15_000;
 
-router.get("/summary", async (req, res) => {
+function normalizeTickers(tickers: Array<Record<string, string>>) {
+  return tickers
+    .filter(t => t.symbol?.endsWith("USDT"))
+    .map(t => ({
+      symbol: t.symbol.replace("USDT", "/USDT"),
+      price: Number(t.lastPrice || t.price || "0"),
+      change24h: Number(t.priceChange || "0"),
+      changePct24h: Number(t.priceChangePercent || "0"),
+      volume24h: Number(t.quoteVolume || "0"),
+      high24h: Number(t.highPrice || "0"),
+      low24h: Number(t.lowPrice || "0"),
+    }));
+}
+
+router.get("/summary", async (_req, res) => {
   const conns = await db.select().from(exchangeConnectionsTable).limit(1);
   const conn = conns[0];
+  const now = Date.now();
+
+  if (cachedRealData && now - lastRealFetch < CACHE_TTL) {
+    return res.json({ source: "binance_public", lastUpdated: new Date(lastRealFetch).toISOString(), data: cachedRealData });
+  }
 
   if (conn?.apiKeyEncrypted && conn.isConnected) {
-    const now = Date.now();
-    if (cachedRealData && now - lastRealFetch < CACHE_TTL) {
-      return res.json({ ...Object.fromEntries(Object.entries({ data: cachedRealData })), source: "binance_live", lastUpdated: new Date(lastRealFetch).toISOString(), data: cachedRealData });
-    }
-
     try {
       const apiKey = decrypt(conn.apiKeyEncrypted);
       const apiSecret = decrypt(conn.apiSecretEncrypted!);
       const client = createBinanceService(apiKey, apiSecret, (conn.networkMode as NetworkMode) ?? "testnet");
-      const tickers = await client.getTickers(POPULAR_PAIRS);
-
-      cachedRealData = tickers
-        .filter(t => t.symbol.endsWith("USDT"))
-        .map(t => ({
-          symbol: t.symbol.replace("USDT", "/USDT"),
-          price: Number(t.lastPrice || t.price || "0"),
-          change24h: Number(t.priceChange),
-          changePct24h: Number(t.priceChangePercent),
-          volume24h: Number(t.quoteVolume),
-          high24h: Number(t.highPrice),
-          low24h: Number(t.lowPrice),
-        }));
+      cachedRealData = normalizeTickers(await client.getTickers(POPULAR_PAIRS));
       lastRealFetch = now;
-
       return res.json({
         source: conn.networkMode === "mainnet" ? "binance_live" : "binance_testnet",
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: new Date(lastRealFetch).toISOString(),
         data: cachedRealData,
       });
     } catch {
-    }
-  }
-
-  if (conn?.apiKeyEncrypted && !conn.isConnected) {
-    try {
-      const client = createBinanceService("", "", "testnet");
-      const tickers = await client.getTickers(POPULAR_PAIRS);
-      const data = tickers
-        .filter(t => t.symbol.endsWith("USDT"))
-        .map(t => ({
-          symbol: t.symbol.replace("USDT", "/USDT"),
-          price: Number(t.lastPrice || t.price || "0"),
-          change24h: Number(t.priceChange),
-          changePct24h: Number(t.priceChangePercent),
-          volume24h: Number(t.quoteVolume),
-          high24h: Number(t.highPrice),
-          low24h: Number(t.lowPrice),
-        }));
-      return res.json({ source: "binance_public", lastUpdated: new Date().toISOString(), data });
-    } catch {
+      // Fall through to public mainnet data.
     }
   }
 
   try {
-    const client = createBinanceService("", "", "testnet");
-    const tickers = await client.getTickers(POPULAR_PAIRS);
-    const data = tickers
-      .filter(t => t.symbol.endsWith("USDT"))
-      .map(t => ({
-        symbol: t.symbol.replace("USDT", "/USDT"),
-        price: Number(t.lastPrice || t.price || "0"),
-        change24h: Number(t.priceChange),
-        changePct24h: Number(t.priceChangePercent),
-        volume24h: Number(t.quoteVolume),
-        high24h: Number(t.highPrice),
-        low24h: Number(t.lowPrice),
-      }));
-    return res.json({ source: "binance_public", lastUpdated: new Date().toISOString(), data });
+    const publicClient = createBinanceService("", "", "mainnet");
+    cachedRealData = normalizeTickers(await publicClient.getTickers(POPULAR_PAIRS));
+    lastRealFetch = now;
+    return res.json({ source: "binance_public", lastUpdated: new Date(lastRealFetch).toISOString(), data: cachedRealData });
   } catch {
     const noise = () => (Math.random() - 0.5) * 0.002;
     return res.json({
@@ -105,7 +77,7 @@ router.get("/summary", async (req, res) => {
   }
 });
 
-router.get("/stats", async (req, res) => {
+router.get("/stats", async (_req, res) => {
   const [strategies, backtests, trades] = await Promise.all([
     db.select().from(strategiesTable),
     db.select().from(backtestResultsTable),
