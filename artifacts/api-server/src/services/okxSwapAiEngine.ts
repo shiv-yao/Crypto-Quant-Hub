@@ -3,6 +3,18 @@ import { isOkxSwapSkillEnabled, listOkxSwapSkills } from "./okxSwapSkills.js";
 
 export type SwapSignalAction = "LONG" | "SHORT" | "HOLD";
 
+export interface AdaptiveTradePlan {
+  leverage: number;
+  notionalUsdt: number;
+  stopLossPct: number;
+  takeProfitPct: number;
+  trailingStopPct: number;
+  maxHoldMinutes: number;
+  exitOnOppositeConfidence: number;
+  volatilityRegime: "low" | "normal" | "high";
+  reasons: string[];
+}
+
 export interface SwapAiSignal {
   instId: string;
   action: SwapSignalAction;
@@ -15,6 +27,7 @@ export interface SwapAiSignal {
   trendPct: number;
   volumeRatio: number;
   reasons: string[];
+  plan: AdaptiveTradePlan;
   generatedAt: string;
 }
 
@@ -28,6 +41,15 @@ export interface SwapAiPosition {
   contracts: string;
   leverage: number;
   unrealizedPnlPct: number;
+  peakFavorablePnlPct: number;
+  stopLossPct: number;
+  takeProfitPct: number;
+  trailingStopPct: number;
+  maxHoldMinutes: number;
+  exitOnOppositeConfidence: number;
+  openedScore: number;
+  lastAiScore: number;
+  volatilityRegime: AdaptiveTradePlan["volatilityRegime"];
   openedAt: string;
   externalOrderId: string | null;
 }
@@ -79,8 +101,16 @@ function numberEnv(name: string, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function round(value: number, digits = 2): number {
+  return Number(value.toFixed(digits));
+}
+
 function getPositionLimit(): number | null {
-  const raw = numberEnv("OKX_SWAP_MAX_POSITIONS", 0);
+  const raw = numberEnv("OKX_SWAP_MAX_POSITIONS", 20);
   return raw > 0 ? Math.floor(raw) : null;
 }
 
@@ -127,6 +157,46 @@ function brokerSyncEnabled(): boolean {
   return process.env.OKX_SWAP_DEMO_ORDERS === "true" && process.env.OKX_NETWORK_MODE !== "mainnet";
 }
 
+function buildAdaptivePlan(input: {
+  confidence: number;
+  atrPct: number;
+  trendPct: number;
+  momentumPct: number;
+  volumeRatio: number;
+}): AdaptiveTradePlan {
+  const maxLeverage = clamp(numberEnv("OKX_SWAP_MAX_LEVERAGE", 2), 1, 3);
+  const baseNotional = clamp(numberEnv("OKX_SWAP_POSITION_USDT", 10), 5, 50);
+  const maxSingleNotional = clamp(numberEnv("OKX_SWAP_MAX_SINGLE_USDT", 30), 5, 50);
+  const volatilityRegime: AdaptiveTradePlan["volatilityRegime"] = input.atrPct >= 2.8 ? "high" : input.atrPct <= 1.1 ? "low" : "normal";
+  const trendStrength = Math.abs(input.trendPct) + Math.abs(input.momentumPct) * 0.6;
+  const confidenceMultiplier = input.confidence >= 80 ? 1.45 : input.confidence >= 65 ? 1.2 : input.confidence >= 50 ? 1 : 0.8;
+  const volatilityMultiplier = volatilityRegime === "high" ? 0.65 : volatilityRegime === "low" ? 1.15 : 1;
+  const volumeMultiplier = input.volumeRatio >= 1.8 ? 1.15 : input.volumeRatio < 0.7 ? 0.8 : 1;
+  const notionalUsdt = round(clamp(baseNotional * confidenceMultiplier * volatilityMultiplier * volumeMultiplier, 5, maxSingleNotional), 2);
+
+  let leverage = 1;
+  if (volatilityRegime !== "high" && input.confidence >= 55) leverage = Math.min(2, maxLeverage);
+  if (volatilityRegime === "low" && input.confidence >= 82 && trendStrength >= 0.45) leverage = Math.min(3, maxLeverage);
+
+  const stopLossPct = round(clamp(input.atrPct * 1.35 + 0.45, 0.9, 4.5), 2);
+  const rewardMultiple = clamp(1.65 + input.confidence / 100, 1.7, 2.55);
+  const takeProfitPct = round(clamp(stopLossPct * rewardMultiple, 1.8, 9), 2);
+  const trailingStopPct = round(clamp(stopLossPct * 0.62, 0.65, 2.8), 2);
+  const maxHoldMinutes = volatilityRegime === "high" ? 90 : trendStrength >= 0.65 ? 300 : 180;
+  const exitOnOppositeConfidence = Math.round(clamp(52 + input.confidence * 0.12, 55, 65));
+  const reasons = [
+    `波動環境 ${volatilityRegime}`,
+    `AI 信心 ${input.confidence}%`,
+    `趨勢強度 ${trendStrength.toFixed(2)}`,
+    `動態倉位 ${notionalUsdt} USDT`,
+    `動態槓桿 ${leverage}x`,
+    `動態停損 ${stopLossPct}%`,
+    `動態停利 ${takeProfitPct}%`,
+    `追蹤停利回撤 ${trailingStopPct}%`,
+  ];
+  return { leverage, notionalUsdt, stopLossPct, takeProfitPct, trailingStopPct, maxHoldMinutes, exitOnOppositeConfidence, volatilityRegime, reasons };
+}
+
 function analyze(instId: string, ticker: OkxSwapTicker, candles: OkxSwapKline[]): SwapAiSignal {
   const rows = [...candles].reverse();
   const closes = rows.map((row) => row.close);
@@ -163,12 +233,13 @@ function analyze(instId: string, ticker: OkxSwapTicker, candles: OkxSwapKline[])
   reasons.push(`量能倍率 ${volumeRatio.toFixed(2)}x`);
   reasons.push(`ATR ${atrPct.toFixed(2)}%`);
 
-  const longThreshold = numberEnv("OKX_SWAP_AI_LONG_SCORE", 67);
-  const shortThreshold = numberEnv("OKX_SWAP_AI_SHORT_SCORE", 33);
+  const longThreshold = numberEnv("OKX_SWAP_AI_LONG_SCORE", 63);
+  const shortThreshold = numberEnv("OKX_SWAP_AI_SHORT_SCORE", 37);
   const action: SwapSignalAction = score >= longThreshold ? "LONG" : score <= shortThreshold ? "SHORT" : "HOLD";
   const confidence = Math.min(99, Math.round(Math.abs(score - 50) * 2));
+  const plan = buildAdaptivePlan({ confidence, atrPct, trendPct, momentumPct, volumeRatio });
 
-  return { instId, action, score: Number(score.toFixed(2)), confidence, price, rsi: Number(rsiValue.toFixed(2)), atrPct: Number(atrPct.toFixed(2)), momentumPct: Number(momentumPct.toFixed(2)), trendPct: Number(trendPct.toFixed(2)), volumeRatio: Number(volumeRatio.toFixed(2)), reasons, generatedAt: new Date().toISOString() };
+  return { instId, action, score: round(score), confidence, price, rsi: round(rsiValue), atrPct: round(atrPct), momentumPct: round(momentumPct), trendPct: round(trendPct), volumeRatio: round(volumeRatio), reasons, plan, generatedAt: new Date().toISOString() };
 }
 
 async function getUniverse() {
@@ -183,12 +254,11 @@ async function getUniverse() {
     .sort((left, right) => Number(right.ticker.volCcy24h) - Number(left.ticker.volCcy24h));
 }
 
-async function maybeBrokerOrder(instrument: OkxSwapInstrument, side: OkxSwapSide, price: number, notionalUsdt: number, reduceOnly = false) {
+async function maybeBrokerOrder(instrument: OkxSwapInstrument, side: OkxSwapSide, price: number, notionalUsdt: number, reduceOnly = false, leverage = 1) {
   if (!brokerSyncEnabled() || !isOkxSwapSkillEnabled("okx.swap.demo-executor")) return { contracts: contractsForNotional(instrument, price, notionalUsdt), orderId: null as string | null };
   const client = createPrivateClient();
   if (!client) throw new Error("OKX Demo API Variables 尚未設定完整");
   const contracts = contractsForNotional(instrument, price, notionalUsdt);
-  const leverage = Math.max(1, Math.min(3, numberEnv("OKX_SWAP_MAX_LEVERAGE", 2)));
   if (!reduceOnly) await client.setLeverage(instrument.instId, leverage, "isolated");
   const result = await client.placeSwapDemoOrder({ instId: instrument.instId, side, contracts, reduceOnly, marginMode: "isolated" });
   state.brokerOrderCount += 1;
@@ -198,9 +268,8 @@ async function maybeBrokerOrder(instrument: OkxSwapInstrument, side: OkxSwapSide
 async function managePositions(universe: Awaited<ReturnType<typeof getUniverse>>) {
   if (!isOkxSwapSkillEnabled("okx.swap.position-manager")) return;
   const tickerMap = new Map(universe.map((item) => [item.ticker.instId, item]));
-  const stopLoss = numberEnv("OKX_SWAP_STOP_LOSS_PCT", 1.5);
-  const takeProfit = numberEnv("OKX_SWAP_TAKE_PROFIT_PCT", 3.5);
   const next: SwapAiPosition[] = [];
+  const client = createOkxSwapService();
 
   for (const position of state.positions) {
     const market = tickerMap.get(position.instId);
@@ -208,13 +277,31 @@ async function managePositions(universe: Awaited<ReturnType<typeof getUniverse>>
     const price = Number(market.ticker.last);
     const raw = position.side === "LONG" ? ((price - position.entryPrice) / position.entryPrice) * 100 : ((position.entryPrice - price) / position.entryPrice) * 100;
     const pnlPct = raw * position.leverage;
-    if (pnlPct <= -stopLoss || pnlPct >= takeProfit) {
-      await maybeBrokerOrder(market.instrument, position.side, price, position.notionalUsdt, true).catch((error) => log("warn", `Demo 平倉同步失敗 ${position.instId}: ${error instanceof Error ? error.message : "未知錯誤"}`));
+    const peakFavorablePnlPct = Math.max(position.peakFavorablePnlPct, pnlPct);
+    const ageMinutes = (Date.now() - new Date(position.openedAt).getTime()) / 60_000;
+    const candles = await client.getSwapKlines(position.instId, "5m", 60);
+    const latestSignal = analyze(position.instId, market.ticker, candles);
+    const oppositeSignal = (position.side === "LONG" && latestSignal.action === "SHORT") || (position.side === "SHORT" && latestSignal.action === "LONG");
+    const trailingTriggered = peakFavorablePnlPct >= position.trailingStopPct && pnlPct <= peakFavorablePnlPct - position.trailingStopPct;
+    const exitReason = pnlPct <= -position.stopLossPct
+      ? `AI 動態停損 ${position.stopLossPct}%`
+      : pnlPct >= position.takeProfitPct
+        ? `AI 動態停利 ${position.takeProfitPct}%`
+        : trailingTriggered
+          ? `AI 追蹤停利回撤 ${position.trailingStopPct}%`
+          : oppositeSignal && latestSignal.confidence >= position.exitOnOppositeConfidence
+            ? `AI 反向訊號 ${latestSignal.action} · 信心 ${latestSignal.confidence}%`
+            : ageMinutes >= position.maxHoldMinutes
+              ? `AI 最大持倉時間 ${position.maxHoldMinutes} 分鐘`
+              : null;
+
+    if (exitReason) {
+      await maybeBrokerOrder(market.instrument, position.side, price, position.notionalUsdt, true, position.leverage).catch((error) => log("warn", `Demo 平倉同步失敗 ${position.instId}: ${error instanceof Error ? error.message : "未知錯誤"}`));
       state.closedCount += 1;
       state.realizedPnlPct += pnlPct;
-      log("info", `平倉 ${position.instId} ${position.side} · PnL ${pnlPct.toFixed(2)}%`);
+      log("info", `平倉 ${position.instId} ${position.side} · ${exitReason} · PnL ${pnlPct.toFixed(2)}%`);
     } else {
-      next.push({ ...position, currentPrice: price, unrealizedPnlPct: Number(pnlPct.toFixed(2)) });
+      next.push({ ...position, currentPrice: price, unrealizedPnlPct: round(pnlPct), peakFavorablePnlPct: round(peakFavorablePnlPct), lastAiScore: latestSignal.score });
     }
   }
   state.positions = next;
@@ -225,18 +312,37 @@ async function maybeOpen(signal: SwapAiSignal, instrument: OkxSwapInstrument) {
   if (state.positions.some((position) => position.instId === signal.instId)) return;
   const positionLimit = getPositionLimit();
   if (positionLimit !== null && state.positions.length >= positionLimit) return;
-  const notionalUsdt = Math.max(5, Math.min(50, numberEnv("OKX_SWAP_POSITION_USDT", 15)));
   const totalExposure = state.positions.reduce((sum, position) => sum + position.notionalUsdt, 0);
-  const maxExposure = Math.max(20, Math.min(250, numberEnv("OKX_SWAP_MAX_EXPOSURE_USDT", 60)));
-  if (totalExposure + notionalUsdt > maxExposure) return;
-  const leverage = Math.max(1, Math.min(3, numberEnv("OKX_SWAP_MAX_LEVERAGE", 2)));
-  const synced = await maybeBrokerOrder(instrument, signal.action, signal.price, notionalUsdt).catch((error) => {
+  const maxExposure = Math.max(20, Math.min(500, numberEnv("OKX_SWAP_MAX_EXPOSURE_USDT", 200)));
+  if (totalExposure + signal.plan.notionalUsdt > maxExposure) return;
+  const synced = await maybeBrokerOrder(instrument, signal.action, signal.price, signal.plan.notionalUsdt, false, signal.plan.leverage).catch((error) => {
     log("warn", `Demo 開倉同步失敗 ${signal.instId}: ${error instanceof Error ? error.message : "未知錯誤"}`);
-    return { contracts: contractsForNotional(instrument, signal.price, notionalUsdt), orderId: null as string | null };
+    return { contracts: contractsForNotional(instrument, signal.price, signal.plan.notionalUsdt), orderId: null as string | null };
   });
-  state.positions.push({ id: `${signal.instId}-${Date.now()}`, instId: signal.instId, side: signal.action, entryPrice: signal.price, currentPrice: signal.price, notionalUsdt, contracts: synced.contracts, leverage, unrealizedPnlPct: 0, openedAt: new Date().toISOString(), externalOrderId: synced.orderId });
+  state.positions.push({
+    id: `${signal.instId}-${Date.now()}`,
+    instId: signal.instId,
+    side: signal.action,
+    entryPrice: signal.price,
+    currentPrice: signal.price,
+    notionalUsdt: signal.plan.notionalUsdt,
+    contracts: synced.contracts,
+    leverage: signal.plan.leverage,
+    unrealizedPnlPct: 0,
+    peakFavorablePnlPct: 0,
+    stopLossPct: signal.plan.stopLossPct,
+    takeProfitPct: signal.plan.takeProfitPct,
+    trailingStopPct: signal.plan.trailingStopPct,
+    maxHoldMinutes: signal.plan.maxHoldMinutes,
+    exitOnOppositeConfidence: signal.plan.exitOnOppositeConfidence,
+    openedScore: signal.score,
+    lastAiScore: signal.score,
+    volatilityRegime: signal.plan.volatilityRegime,
+    openedAt: new Date().toISOString(),
+    externalOrderId: synced.orderId,
+  });
   state.openedCount += 1;
-  log("info", `建立 ${signal.action} ${signal.instId} · ${notionalUsdt} USDT · ${leverage}x`);
+  log("info", `建立 ${signal.action} ${signal.instId} · ${signal.plan.notionalUsdt} USDT · ${signal.plan.leverage}x · SL ${signal.plan.stopLossPct}% · TP ${signal.plan.takeProfitPct}%`);
 }
 
 export async function runOkxSwapAiCycle() {
@@ -248,7 +354,7 @@ export async function runOkxSwapAiCycle() {
     state.universeCount = universe.length;
     await managePositions(universe);
     if (!isOkxSwapSkillEnabled("okx.swap.ai-score")) return getOkxSwapAiState();
-    const batchSize = Math.max(3, Math.min(30, numberEnv("OKX_SWAP_SCAN_BATCH", 10)));
+    const batchSize = Math.max(3, Math.min(30, numberEnv("OKX_SWAP_SCAN_BATCH", 20)));
     const start = universe.length ? state.cursor % universe.length : 0;
     const batch = universe.slice(start, start + batchSize);
     if (batch.length < batchSize) batch.push(...universe.slice(0, batchSize - batch.length));
@@ -285,9 +391,10 @@ export function getOkxSwapAiState() {
     logs: [...state.logs],
     skills: listOkxSwapSkills(),
     brokerSyncEnabled: brokerSyncEnabled(),
-    intervalMs: Math.max(20_000, numberEnv("OKX_SWAP_AI_INTERVAL_MS", 45_000)),
+    intervalMs: Math.max(20_000, numberEnv("OKX_SWAP_AI_INTERVAL_MS", 30_000)),
     positionLimit: getPositionLimit(),
-    maxExposureUsdt: Math.max(20, Math.min(250, numberEnv("OKX_SWAP_MAX_EXPOSURE_USDT", 60))),
+    maxExposureUsdt: Math.max(20, Math.min(500, numberEnv("OKX_SWAP_MAX_EXPOSURE_USDT", 200))),
+    adaptiveParametersEnabled: true,
   };
 }
 
@@ -295,10 +402,10 @@ export function startOkxSwapAiEngine() {
   state.enabled = true;
   if (!state.startedAt) state.startedAt = new Date().toISOString();
   if (!timer) {
-    const intervalMs = Math.max(20_000, numberEnv("OKX_SWAP_AI_INTERVAL_MS", 45_000));
+    const intervalMs = Math.max(20_000, numberEnv("OKX_SWAP_AI_INTERVAL_MS", 30_000));
     timer = setInterval(() => void runOkxSwapAiCycle(), intervalMs);
     void runOkxSwapAiCycle();
-    log("info", `OKX 合約 AI Demo 引擎已啟動 · interval ${intervalMs}ms`);
+    log("info", `OKX 合約 AI Demo 引擎已啟動 · 自適應參數已開啟 · interval ${intervalMs}ms`);
   }
   return getOkxSwapAiState();
 }
