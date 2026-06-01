@@ -3,7 +3,17 @@ import { logger } from "./lib/logger";
 import { bootstrapAutoTrader } from "./services/autoTrader.js";
 import { bootstrapOkxSwapAiEngine } from "./services/okxSwapAiEngine.js";
 
-process.env.OKX_SWAP_MAX_POSITIONS ??= "10";
+// OKX Swap AI Demo stress-test defaults. Railway Variables still take precedence.
+process.env.OKX_SWAP_MAX_POSITIONS ??= "20";
+process.env.OKX_SWAP_POSITION_USDT ??= "10";
+process.env.OKX_SWAP_MAX_EXPOSURE_USDT ??= "200";
+process.env.OKX_SWAP_MAX_LEVERAGE ??= "2";
+process.env.OKX_SWAP_STOP_LOSS_PCT ??= "2.5";
+process.env.OKX_SWAP_TAKE_PROFIT_PCT ??= "4";
+process.env.OKX_SWAP_SCAN_BATCH ??= "20";
+process.env.OKX_SWAP_AI_INTERVAL_MS ??= "30000";
+process.env.OKX_SWAP_AI_LONG_SCORE ??= "63";
+process.env.OKX_SWAP_AI_SHORT_SCORE ??= "37";
 
 const rawPort = process.env["PORT"];
 
