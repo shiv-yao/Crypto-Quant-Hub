@@ -11,4 +11,4 @@ RUN pnpm --filter @workspace/api-server run build
 
 ENV NODE_ENV=production
 
-CMD ["sh", "-c", "node lib/db/src/bootstrap.mjs && node --enable-source-maps artifacts/api-server/dist/index.mjs"]
+CMD ["node", "lib/db/src/start.mjs"]
