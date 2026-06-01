@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, Database, RefreshCw, ShieldCheck, Wallet, Wifi, AlertTriangle } from "lucide-react";
+import { Activity, Database, RefreshCw, ShieldCheck, Wallet, Wifi, AlertTriangle, PlayCircle, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 
 interface OkxStatus {
   exchange: string;
@@ -24,6 +24,33 @@ interface OkxAccount {
   lastUpdated: string;
 }
 
+interface SystemTestStep {
+  name: string;
+  status: "passed" | "failed" | "skipped";
+  durationMs: number;
+  details?: Record<string, unknown>;
+  error?: string;
+}
+
+interface SystemTestResult {
+  success: boolean;
+  exchange: string;
+  mode: string;
+  safeMode: boolean;
+  symbol: string;
+  tickerLast: string | null;
+  startedAt: string;
+  completedAt: string;
+  summary: {
+    passed: number;
+    failed: number;
+    skipped: number;
+    total: number;
+  };
+  steps: SystemTestStep[];
+  message: string;
+}
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   const payload = await response.json().catch(() => ({ error: "回傳格式不是 JSON" }));
@@ -42,6 +69,12 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
+function StepIcon({ status }: { status: SystemTestStep["status"] }) {
+  if (status === "passed") return <CheckCircle2 size={15} className="text-emerald-400" />;
+  if (status === "failed") return <XCircle size={15} className="text-red-400" />;
+  return <MinusCircle size={15} className="text-amber-400" />;
+}
+
 export default function Okx() {
   const [status, setStatus] = useState<OkxStatus | null>(null);
   const [account, setAccount] = useState<OkxAccount | null>(null);
@@ -53,6 +86,9 @@ export default function Okx() {
   const [quantity, setQuantity] = useState("10");
   const [price, setPrice] = useState("");
   const [confirmDemo, setConfirmDemo] = useState(false);
+  const [systemTestUsdt, setSystemTestUsdt] = useState("10");
+  const [confirmSystemTest, setConfirmSystemTest] = useState(false);
+  const [systemTest, setSystemTest] = useState<SystemTestResult | null>(null);
 
   async function loadStatus() {
     setLoading(true);
@@ -112,11 +148,39 @@ export default function Okx() {
     }
   }
 
+  async function runSystemTest() {
+    setLoading(true);
+    setSystemTest(null);
+    setMessage("正在執行 OKX 全系統 Demo 測試...");
+    try {
+      const testUsdt = Number(systemTestUsdt);
+      const data = await api<SystemTestResult>("/api/okx/system-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol,
+          testUsdt,
+          executeDemoOrder: true,
+          confirmDemo: confirmSystemTest,
+        }),
+      });
+      setSystemTest(data);
+      setMessage(data.message);
+      await loadAccount();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "OKX 全系統 Demo 測試失敗");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadStatus();
   }, []);
 
   const usdt = account?.balances.find((item) => item.asset === "USDT");
+  const parsedSystemTestUsdt = Number(systemTestUsdt);
+  const systemTestAmountValid = Number.isFinite(parsedSystemTestUsdt) && parsedSystemTestUsdt > 0 && parsedSystemTestUsdt <= 20;
 
   return (
     <div className="p-6 space-y-5">
@@ -160,7 +224,55 @@ export default function Okx() {
         <div className="rounded-md bg-background p-3 text-xs font-mono text-muted-foreground break-words">{message}</div>
       </Card>
 
-      <Card title="OKX Demo 下單">
+      <Card title="OKX 全系統 Demo 測試">
+        <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 leading-relaxed">
+          <ShieldCheck size={14} className="mt-0.5 flex-shrink-0" />
+          <span>依序測試：環境安全檢查、OKX 公開主網行情、K 線、Demo API 憑證、Demo 帳戶資產與 Demo 市價買入。僅允許 testnet，測試金額上限 20 USDT。</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-xs text-muted-foreground">測試交易對
+            <select value={symbol} onChange={(event) => setSymbol(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm text-foreground">
+              <option>BTC/USDT</option><option>ETH/USDT</option><option>SOL/USDT</option>
+            </select>
+          </label>
+          <label className="text-xs text-muted-foreground">測試金額 USDT（最大 20）
+            <input value={systemTestUsdt} onChange={(event) => setSystemTestUsdt(event.target.value)} className="mt-1 w-full rounded-md border border-border bg-background p-2 text-sm text-foreground" />
+          </label>
+        </div>
+        {!systemTestAmountValid && <p className="text-xs text-red-400">測試金額必須大於 0 且不得超過 20 USDT。</p>}
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input type="checkbox" checked={confirmSystemTest} onChange={(event) => setConfirmSystemTest(event.target.checked)} />
+          我確認執行 OKX Demo 全系統測試，並同意送出一筆 Demo 市價買入測試單
+        </label>
+        <button onClick={() => void runSystemTest()} disabled={loading || !confirmSystemTest || !systemTestAmountValid} className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">
+          <PlayCircle size={14} /> 執行全系統模擬測試
+        </button>
+        {systemTest && (
+          <div className="space-y-3 rounded-md border border-border bg-background p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className={`text-sm font-semibold ${systemTest.success ? "text-emerald-400" : "text-amber-400"}`}>{systemTest.message}</span>
+              <span className="text-xs font-mono text-muted-foreground">通過 {systemTest.summary.passed} · 失敗 {systemTest.summary.failed} · 略過 {systemTest.summary.skipped}</span>
+            </div>
+            <div className="space-y-2">
+              {systemTest.steps.map((step) => (
+                <div key={step.name} className="rounded-md border border-border/60 bg-card p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <StepIcon status={step.status} />
+                      <span className="text-xs font-semibold text-foreground">{step.name}</span>
+                    </div>
+                    <span className="text-xs font-mono text-muted-foreground">{step.durationMs} ms</span>
+                  </div>
+                  {step.error && <p className="mt-2 text-xs text-red-400 break-words">{step.error}</p>}
+                  {step.details && <pre className="mt-2 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">{JSON.stringify(step.details, null, 2)}</pre>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <Card title="OKX Demo 單筆下單">
         <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 leading-relaxed">
           <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
           <span>市價買入時，數量代表 USDT 金額；限價單與市價賣出則代表基礎幣數量。目前只允許 Demo Trading。</span>
