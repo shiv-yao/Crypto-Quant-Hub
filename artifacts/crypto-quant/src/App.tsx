@@ -14,6 +14,7 @@ import Trades from "@/pages/trades";
 import Settings from "@/pages/settings";
 import Trading from "@/pages/trading";
 import Bitget from "@/pages/bitget";
+import Okx from "@/pages/okx";
 import AuditLogs from "@/pages/audit-logs";
 import {
   LayoutDashboard, Layers, BarChart2, Activity, ShieldAlert, List,
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { path: "/paper-trading", label: "模擬交易", icon: Activity },
   { path: "/trading", label: "手動交易", icon: CandlestickChart },
   { path: "/bitget", label: "Bitget API", icon: Radio },
+  { path: "/okx", label: "OKX API", icon: Radio },
   { path: "/risk", label: "風險管理", icon: ShieldAlert },
   { path: "/trades", label: "交易紀錄", icon: List },
   { path: "/audit-logs", label: "稽核紀錄", icon: FileText },
@@ -138,7 +140,7 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
             </div>
           ) : (
             <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <p className="text-xs text-amber-400 leading-relaxed">行情使用 Bitget 真實公開數據；下單預設為 Demo Trading</p>
+              <p className="text-xs text-amber-400 leading-relaxed">行情使用真實公開數據；下單預設為 Demo Trading</p>
             </div>
           )}
         </div>
@@ -188,6 +190,7 @@ function Router() {
         <Route path="/paper-trading" component={PaperTrading} />
         <Route path="/trading" component={Trading} />
         <Route path="/bitget" component={Bitget} />
+        <Route path="/okx" component={Okx} />
         <Route path="/risk" component={Risk} />
         <Route path="/trades" component={Trades} />
         <Route path="/audit-logs" component={AuditLogs} />
