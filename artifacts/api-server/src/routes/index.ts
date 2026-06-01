@@ -7,6 +7,8 @@ import riskRouter from "./risk";
 import tradesRouter from "./trades";
 import marketRouter from "./market";
 import settingsRouter from "./settings";
+import exchangeRouter from "./exchange";
+import auditLogsRouter from "./auditLogs";
 
 const router: IRouter = Router();
 
@@ -19,5 +21,7 @@ router.use("/trades", tradesRouter);
 router.use("/market", marketRouter);
 router.use("/dashboard", marketRouter);
 router.use("/settings", settingsRouter);
+router.use("/exchange", exchangeRouter);
+router.use("/audit-logs", auditLogsRouter);
 
 export default router;

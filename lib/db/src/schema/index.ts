@@ -82,6 +82,10 @@ export const riskSettingsTable = pgTable("risk_settings", {
   trailingStopPct: numeric("trailing_stop_pct", { precision: 10, scale: 4 }).notNull().default("1.5"),
   trailingStopEnabled: boolean("trailing_stop_enabled").notNull().default(false),
   emergencyStopEnabled: boolean("emergency_stop_enabled").notNull().default(false),
+  maxSingleOrderUsdt: numeric("max_single_order_usdt", { precision: 20, scale: 2 }).notNull().default("500"),
+  maxTotalExposureUsdt: numeric("max_total_exposure_usdt", { precision: 20, scale: 2 }).notNull().default("2000"),
+  maxConsecutiveLosses: integer("max_consecutive_losses").notNull().default(5),
+  allowedSymbols: jsonb("allowed_symbols").notNull().default(["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT"]),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -99,6 +103,8 @@ export const tradeRecordsTable = pgTable("trade_records", {
   strategyName: text("strategy_name").notNull(),
   executedAt: timestamp("executed_at").notNull().defaultNow(),
   mode: text("mode").notNull().default("paper"),
+  orderSource: text("order_source").notNull().default("strategy"),
+  exchangeOrderId: text("exchange_order_id"),
 });
 
 export type TradeRecord = typeof tradeRecordsTable.$inferSelect;
@@ -107,9 +113,54 @@ export const systemSettingsTable = pgTable("system_settings", {
   id: serial("id").primaryKey(),
   mode: text("mode").notNull().default("paper"),
   exchangeName: text("exchange_name").notNull().default("Binance"),
+  networkMode: text("network_mode").notNull().default("testnet"),
   apiKeySet: boolean("api_key_set").notNull().default(false),
   tradingEnabled: boolean("trading_enabled").notNull().default(false),
+  liveReadyStep: integer("live_ready_step").notNull().default(0),
+  connectionStatus: text("connection_status").notNull().default("disconnected"),
+  connectionError: text("connection_error"),
+  lastConnectedAt: timestamp("last_connected_at"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export type SystemSettings = typeof systemSettingsTable.$inferSelect;
+
+export const exchangeConnectionsTable = pgTable("exchange_connections", {
+  id: serial("id").primaryKey(),
+  exchange: text("exchange").notNull().default("Binance"),
+  apiKeyEncrypted: text("api_key_encrypted"),
+  apiSecretEncrypted: text("api_secret_encrypted"),
+  networkMode: text("network_mode").notNull().default("testnet"),
+  isConnected: boolean("is_connected").notNull().default(false),
+  lastTestedAt: timestamp("last_tested_at"),
+  connectionError: text("connection_error"),
+  accountInfo: jsonb("account_info"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type ExchangeConnection = typeof exchangeConnectionsTable.$inferSelect;
+
+export const auditLogsTable = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  action: text("action").notNull(),
+  details: jsonb("details"),
+  mode: text("mode").notNull().default("paper"),
+  source: text("source").notNull().default("manual"),
+  result: text("result").notNull().default("success"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type AuditLog = typeof auditLogsTable.$inferSelect;
+
+export const dailyPnlTable = pgTable("daily_pnl", {
+  id: serial("id").primaryKey(),
+  date: text("date").notNull(),
+  realizedPnl: numeric("realized_pnl", { precision: 20, scale: 8 }).notNull().default("0"),
+  tradeCount: integer("trade_count").notNull().default(0),
+  consecutiveLosses: integer("consecutive_losses").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type DailyPnl = typeof dailyPnlTable.$inferSelect;

@@ -1,0 +1,3 @@
+- [Orval codegen config](orval-codegen.md) — zod output must use mode:"tags" with target:"generated/api.ts"; index.ts must export each tag file manually.
+- [Binance ticker price field](binance-ticker.md) — /api/v3/ticker/24hr returns `lastPrice` not `price`; always use `t.lastPrice || t.price`.
+- [API server zod dependency](api-server-deps.md) — zod must be listed in api-server/package.json dependencies (not just workspace root); esbuild can't bundle it otherwise.

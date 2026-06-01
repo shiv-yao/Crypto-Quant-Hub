@@ -20,24 +20,40 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AuditLog,
   BacktestInput,
   BacktestResult,
+  CancelExchangeOrderParams,
+  ConnectionTestResult,
   DashboardStats,
   EmergencyStopResult,
+  EnableLiveInput,
+  ExchangeAccount,
+  ExchangeConfigInput,
+  ExchangeOrder,
+  ExchangeStatus,
+  GetExchangeOrdersParams,
+  GetKlinesParams,
   HealthStatus,
-  MarketTicker,
+  KlineResponse,
+  ListAuditLogsParams,
+  MarketSummaryResponse,
   Order,
   PaperTradingSummary,
+  PlaceOrderInput,
+  PlaceOrderResult,
   Position,
   RiskSettings,
   RiskSettingsUpdate,
+  SimpleSuccess,
   Strategy,
   StrategyExecution,
   StrategyInput,
   StrategyUpdate,
   SystemSettings,
   SystemSettingsUpdate,
-  TradeRecord
+  TradeRecord,
+  TradingPair
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1326,11 +1342,11 @@ export const getGetMarketSummaryUrl = () => {
 }
 
 /**
- * @summary Get demo market data summary for popular pairs
+ * @summary Get market data (real Binance if connected, else demo)
  */
-export const getMarketSummary = async ( options?: RequestInit): Promise<MarketTicker[]> => {
+export const getMarketSummary = async ( options?: RequestInit): Promise<MarketSummaryResponse> => {
 
-  return customFetch<MarketTicker[]>(getGetMarketSummaryUrl(),
+  return customFetch<MarketSummaryResponse>(getGetMarketSummaryUrl(),
   {
     ...options,
     method: 'GET'
@@ -1373,7 +1389,7 @@ export type GetMarketSummaryQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get demo market data summary for popular pairs
+ * @summary Get market data (real Binance if connected, else demo)
  */
 
 export function useGetMarketSummary<TData = Awaited<ReturnType<typeof getMarketSummary>>, TError = ErrorType<unknown>>(
@@ -1618,4 +1634,919 @@ export const useUpdateSettings = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateSettingsMutationOptions(options));
     }
+
+export const getGetExchangeStatusUrl = () => {
+
+
+
+
+  return `/api/exchange/status`
+}
+
+/**
+ * @summary Get exchange connection status
+ */
+export const getExchangeStatus = async ( options?: RequestInit): Promise<ExchangeStatus> => {
+
+  return customFetch<ExchangeStatus>(getGetExchangeStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExchangeStatusQueryKey = () => {
+    return [
+    `/api/exchange/status`
+    ] as const;
+    }
+
+
+export const getGetExchangeStatusQueryOptions = <TData = Awaited<ReturnType<typeof getExchangeStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangeStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExchangeStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExchangeStatus>>> = ({ signal }) => getExchangeStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExchangeStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExchangeStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getExchangeStatus>>>
+export type GetExchangeStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get exchange connection status
+ */
+
+export function useGetExchangeStatus<TData = Awaited<ReturnType<typeof getExchangeStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangeStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExchangeStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSaveExchangeConfigUrl = () => {
+
+
+
+
+  return `/api/exchange/config`
+}
+
+/**
+ * @summary Save API keys (server-side only, never returned)
+ */
+export const saveExchangeConfig = async (exchangeConfigInput: ExchangeConfigInput, options?: RequestInit): Promise<SimpleSuccess> => {
+
+  return customFetch<SimpleSuccess>(getSaveExchangeConfigUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      exchangeConfigInput,)
+  }
+);}
+
+
+
+
+export const getSaveExchangeConfigMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveExchangeConfig>>, TError,{data: BodyType<ExchangeConfigInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveExchangeConfig>>, TError,{data: BodyType<ExchangeConfigInput>}, TContext> => {
+
+const mutationKey = ['saveExchangeConfig'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveExchangeConfig>>, {data: BodyType<ExchangeConfigInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveExchangeConfig(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveExchangeConfigMutationResult = NonNullable<Awaited<ReturnType<typeof saveExchangeConfig>>>
+    export type SaveExchangeConfigMutationBody = BodyType<ExchangeConfigInput>
+    export type SaveExchangeConfigMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save API keys (server-side only, never returned)
+ */
+export const useSaveExchangeConfig = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveExchangeConfig>>, TError,{data: BodyType<ExchangeConfigInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveExchangeConfig>>,
+        TError,
+        {data: BodyType<ExchangeConfigInput>},
+        TContext
+      > => {
+      return useMutation(getSaveExchangeConfigMutationOptions(options));
+    }
+
+export const getTestExchangeConnectionUrl = () => {
+
+
+
+
+  return `/api/exchange/test-connection`
+}
+
+/**
+ * @summary Test API key connectivity
+ */
+export const testExchangeConnection = async ( options?: RequestInit): Promise<ConnectionTestResult> => {
+
+  return customFetch<ConnectionTestResult>(getTestExchangeConnectionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getTestExchangeConnectionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testExchangeConnection>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof testExchangeConnection>>, TError,void, TContext> => {
+
+const mutationKey = ['testExchangeConnection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof testExchangeConnection>>, void> = () => {
+
+
+          return  testExchangeConnection(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TestExchangeConnectionMutationResult = NonNullable<Awaited<ReturnType<typeof testExchangeConnection>>>
+
+    export type TestExchangeConnectionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Test API key connectivity
+ */
+export const useTestExchangeConnection = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof testExchangeConnection>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof testExchangeConnection>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getTestExchangeConnectionMutationOptions(options));
+    }
+
+export const getGetExchangeAccountUrl = () => {
+
+
+
+
+  return `/api/exchange/account`
+}
+
+/**
+ * @summary Get real account balances
+ */
+export const getExchangeAccount = async ( options?: RequestInit): Promise<ExchangeAccount> => {
+
+  return customFetch<ExchangeAccount>(getGetExchangeAccountUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExchangeAccountQueryKey = () => {
+    return [
+    `/api/exchange/account`
+    ] as const;
+    }
+
+
+export const getGetExchangeAccountQueryOptions = <TData = Awaited<ReturnType<typeof getExchangeAccount>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangeAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExchangeAccountQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExchangeAccount>>> = ({ signal }) => getExchangeAccount({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExchangeAccount>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExchangeAccountQueryResult = NonNullable<Awaited<ReturnType<typeof getExchangeAccount>>>
+export type GetExchangeAccountQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get real account balances
+ */
+
+export function useGetExchangeAccount<TData = Awaited<ReturnType<typeof getExchangeAccount>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangeAccount>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExchangeAccountQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetExchangePairsUrl = () => {
+
+
+
+
+  return `/api/exchange/pairs`
+}
+
+/**
+ * @summary Get available trading pairs with precision info
+ */
+export const getExchangePairs = async ( options?: RequestInit): Promise<TradingPair[]> => {
+
+  return customFetch<TradingPair[]>(getGetExchangePairsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExchangePairsQueryKey = () => {
+    return [
+    `/api/exchange/pairs`
+    ] as const;
+    }
+
+
+export const getGetExchangePairsQueryOptions = <TData = Awaited<ReturnType<typeof getExchangePairs>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangePairs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExchangePairsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExchangePairs>>> = ({ signal }) => getExchangePairs({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExchangePairs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExchangePairsQueryResult = NonNullable<Awaited<ReturnType<typeof getExchangePairs>>>
+export type GetExchangePairsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get available trading pairs with precision info
+ */
+
+export function useGetExchangePairs<TData = Awaited<ReturnType<typeof getExchangePairs>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangePairs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExchangePairsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetKlinesUrl = (params: GetKlinesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/exchange/klines?${stringifiedParams}` : `/api/exchange/klines`
+}
+
+/**
+ * @summary Get OHLCV kline data
+ */
+export const getKlines = async (params: GetKlinesParams, options?: RequestInit): Promise<KlineResponse> => {
+
+  return customFetch<KlineResponse>(getGetKlinesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetKlinesQueryKey = (params?: GetKlinesParams,) => {
+    return [
+    `/api/exchange/klines`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetKlinesQueryOptions = <TData = Awaited<ReturnType<typeof getKlines>>, TError = ErrorType<unknown>>(params: GetKlinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKlines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetKlinesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getKlines>>> = ({ signal }) => getKlines(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getKlines>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetKlinesQueryResult = NonNullable<Awaited<ReturnType<typeof getKlines>>>
+export type GetKlinesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get OHLCV kline data
+ */
+
+export function useGetKlines<TData = Awaited<ReturnType<typeof getKlines>>, TError = ErrorType<unknown>>(
+ params: GetKlinesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getKlines>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetKlinesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPlaceOrderUrl = () => {
+
+
+
+
+  return `/api/exchange/place-order`
+}
+
+/**
+ * @summary Place an order (paper/testnet/live)
+ */
+export const placeOrder = async (placeOrderInput: PlaceOrderInput, options?: RequestInit): Promise<PlaceOrderResult> => {
+
+  return customFetch<PlaceOrderResult>(getPlaceOrderUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      placeOrderInput,)
+  }
+);}
+
+
+
+
+export const getPlaceOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeOrder>>, TError,{data: BodyType<PlaceOrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof placeOrder>>, TError,{data: BodyType<PlaceOrderInput>}, TContext> => {
+
+const mutationKey = ['placeOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof placeOrder>>, {data: BodyType<PlaceOrderInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  placeOrder(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PlaceOrderMutationResult = NonNullable<Awaited<ReturnType<typeof placeOrder>>>
+    export type PlaceOrderMutationBody = BodyType<PlaceOrderInput>
+    export type PlaceOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Place an order (paper/testnet/live)
+ */
+export const usePlaceOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof placeOrder>>, TError,{data: BodyType<PlaceOrderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof placeOrder>>,
+        TError,
+        {data: BodyType<PlaceOrderInput>},
+        TContext
+      > => {
+      return useMutation(getPlaceOrderMutationOptions(options));
+    }
+
+export const getGetExchangeOrdersUrl = (params?: GetExchangeOrdersParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/exchange/orders?${stringifiedParams}` : `/api/exchange/orders`
+}
+
+/**
+ * @summary List open orders from exchange
+ */
+export const getExchangeOrders = async (params?: GetExchangeOrdersParams, options?: RequestInit): Promise<ExchangeOrder[]> => {
+
+  return customFetch<ExchangeOrder[]>(getGetExchangeOrdersUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetExchangeOrdersQueryKey = (params?: GetExchangeOrdersParams,) => {
+    return [
+    `/api/exchange/orders`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetExchangeOrdersQueryOptions = <TData = Awaited<ReturnType<typeof getExchangeOrders>>, TError = ErrorType<unknown>>(params?: GetExchangeOrdersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangeOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetExchangeOrdersQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getExchangeOrders>>> = ({ signal }) => getExchangeOrders(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getExchangeOrders>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetExchangeOrdersQueryResult = NonNullable<Awaited<ReturnType<typeof getExchangeOrders>>>
+export type GetExchangeOrdersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List open orders from exchange
+ */
+
+export function useGetExchangeOrders<TData = Awaited<ReturnType<typeof getExchangeOrders>>, TError = ErrorType<unknown>>(
+ params?: GetExchangeOrdersParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getExchangeOrders>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetExchangeOrdersQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCancelExchangeOrderUrl = (orderId: number,
+    params: CancelExchangeOrderParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/exchange/orders/${orderId}?${stringifiedParams}` : `/api/exchange/orders/${orderId}`
+}
+
+/**
+ * @summary Cancel an open order
+ */
+export const cancelExchangeOrder = async (orderId: number,
+    params: CancelExchangeOrderParams, options?: RequestInit): Promise<SimpleSuccess> => {
+
+  return customFetch<SimpleSuccess>(getCancelExchangeOrderUrl(orderId,params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getCancelExchangeOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelExchangeOrder>>, TError,{orderId: number;params: CancelExchangeOrderParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof cancelExchangeOrder>>, TError,{orderId: number;params: CancelExchangeOrderParams}, TContext> => {
+
+const mutationKey = ['cancelExchangeOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelExchangeOrder>>, {orderId: number;params: CancelExchangeOrderParams}> = (props) => {
+          const {orderId,params} = props ?? {};
+
+          return  cancelExchangeOrder(orderId,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CancelExchangeOrderMutationResult = NonNullable<Awaited<ReturnType<typeof cancelExchangeOrder>>>
+
+    export type CancelExchangeOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Cancel an open order
+ */
+export const useCancelExchangeOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof cancelExchangeOrder>>, TError,{orderId: number;params: CancelExchangeOrderParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof cancelExchangeOrder>>,
+        TError,
+        {orderId: number;params: CancelExchangeOrderParams},
+        TContext
+      > => {
+      return useMutation(getCancelExchangeOrderMutationOptions(options));
+    }
+
+export const getEnableLiveTradingUrl = () => {
+
+
+
+
+  return `/api/exchange/enable-live`
+}
+
+/**
+ * @summary Enable live trading after all safety checks
+ */
+export const enableLiveTrading = async (enableLiveInput: EnableLiveInput, options?: RequestInit): Promise<SimpleSuccess> => {
+
+  return customFetch<SimpleSuccess>(getEnableLiveTradingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      enableLiveInput,)
+  }
+);}
+
+
+
+
+export const getEnableLiveTradingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enableLiveTrading>>, TError,{data: BodyType<EnableLiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof enableLiveTrading>>, TError,{data: BodyType<EnableLiveInput>}, TContext> => {
+
+const mutationKey = ['enableLiveTrading'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof enableLiveTrading>>, {data: BodyType<EnableLiveInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  enableLiveTrading(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EnableLiveTradingMutationResult = NonNullable<Awaited<ReturnType<typeof enableLiveTrading>>>
+    export type EnableLiveTradingMutationBody = BodyType<EnableLiveInput>
+    export type EnableLiveTradingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Enable live trading after all safety checks
+ */
+export const useEnableLiveTrading = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enableLiveTrading>>, TError,{data: BodyType<EnableLiveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof enableLiveTrading>>,
+        TError,
+        {data: BodyType<EnableLiveInput>},
+        TContext
+      > => {
+      return useMutation(getEnableLiveTradingMutationOptions(options));
+    }
+
+export const getDisableLiveTradingUrl = () => {
+
+
+
+
+  return `/api/exchange/disable-live`
+}
+
+/**
+ * @summary Disable live trading, revert to paper mode
+ */
+export const disableLiveTrading = async ( options?: RequestInit): Promise<SimpleSuccess> => {
+
+  return customFetch<SimpleSuccess>(getDisableLiveTradingUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDisableLiveTradingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableLiveTrading>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disableLiveTrading>>, TError,void, TContext> => {
+
+const mutationKey = ['disableLiveTrading'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disableLiveTrading>>, void> = () => {
+
+
+          return  disableLiveTrading(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisableLiveTradingMutationResult = NonNullable<Awaited<ReturnType<typeof disableLiveTrading>>>
+
+    export type DisableLiveTradingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Disable live trading, revert to paper mode
+ */
+export const useDisableLiveTrading = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disableLiveTrading>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disableLiveTrading>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDisableLiveTradingMutationOptions(options));
+    }
+
+export const getListAuditLogsUrl = (params?: ListAuditLogsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/audit-logs?${stringifiedParams}` : `/api/audit-logs`
+}
+
+/**
+ * @summary List audit log entries
+ */
+export const listAuditLogs = async (params?: ListAuditLogsParams, options?: RequestInit): Promise<AuditLog[]> => {
+
+  return customFetch<AuditLog[]>(getListAuditLogsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAuditLogsQueryKey = (params?: ListAuditLogsParams,) => {
+    return [
+    `/api/audit-logs`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListAuditLogsQueryOptions = <TData = Awaited<ReturnType<typeof listAuditLogs>>, TError = ErrorType<unknown>>(params?: ListAuditLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAuditLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAuditLogsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAuditLogs>>> = ({ signal }) => listAuditLogs(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAuditLogs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAuditLogsQueryResult = NonNullable<Awaited<ReturnType<typeof listAuditLogs>>>
+export type ListAuditLogsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List audit log entries
+ */
+
+export function useListAuditLogs<TData = Awaited<ReturnType<typeof listAuditLogs>>, TError = ErrorType<unknown>>(
+ params?: ListAuditLogsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAuditLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAuditLogsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 

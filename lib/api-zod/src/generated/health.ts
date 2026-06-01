@@ -5,11 +5,14 @@
  * Crypto Quant Trading System API
  * OpenAPI spec version: 0.1.0
  */
+import * as zod from 'zod';
 
-export type OrderSide = typeof OrderSide[keyof typeof OrderSide];
 
 
-export const OrderSide = {
-  buy: 'buy',
-  sell: 'sell',
-} as const;
+/**
+ * @summary Health check
+ */
+export const HealthCheckResponse = zod.object({
+  "status": zod.string()
+})
+
