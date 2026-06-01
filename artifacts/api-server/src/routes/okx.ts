@@ -4,6 +4,15 @@ import { createOkxService, type OkxNetworkMode } from "../services/okx.js";
 
 const router = Router();
 
+type SystemTestStatus = "passed" | "failed" | "skipped";
+type SystemTestStep = {
+  name: string;
+  status: SystemTestStatus;
+  durationMs: number;
+  details?: Record<string, unknown>;
+  error?: string;
+};
+
 function getNetworkMode(): OkxNetworkMode {
   return process.env.OKX_NETWORK_MODE === "mainnet" ? "mainnet" : "testnet";
 }
@@ -196,6 +205,125 @@ router.post("/demo-order", async (req, res) => {
       error: error instanceof Error ? error.message : "OKX Demo 下單失敗",
     });
   }
+});
+
+const SystemTestSchema = z.object({
+  symbol: z.string().default("BTC/USDT"),
+  testUsdt: z.number().positive().max(20).default(10),
+  executeDemoOrder: z.boolean().default(true),
+  confirmDemo: z.literal(true),
+});
+
+router.post("/system-test", async (req, res) => {
+  if (getNetworkMode() !== "testnet") {
+    return res.status(403).json({
+      success: false,
+      error: "全系統測試只允許 OKX Demo Trading。請將 OKX_NETWORK_MODE 設為 testnet。",
+    });
+  }
+
+  const body = SystemTestSchema.parse(req.body);
+  const startedAt = new Date();
+  const steps: SystemTestStep[] = [];
+
+  async function runStep<T>(name: string, fn: () => Promise<{ value: T; details?: Record<string, unknown> }>): Promise<T | null> {
+    const started = Date.now();
+    try {
+      const result = await fn();
+      steps.push({ name, status: "passed", durationMs: Date.now() - started, details: result.details });
+      return result.value;
+    } catch (error) {
+      steps.push({
+        name,
+        status: "failed",
+        durationMs: Date.now() - started,
+        error: error instanceof Error ? error.message : "未知錯誤",
+      });
+      return null;
+    }
+  }
+
+  await runStep("環境安全檢查", async () => ({
+    value: true,
+    details: { networkMode: getNetworkMode(), liveTradingEnabled: false, maxTestUsdt: 20 },
+  }));
+
+  const publicClient = createOkxService();
+  const ticker = await runStep("OKX 公開主網行情", async () => {
+    const rows = await publicClient.getTickers([body.symbol]);
+    const first = rows[0];
+    if (!first) throw new Error(`找不到 ${body.symbol} 行情`);
+    return {
+      value: first,
+      details: { symbol: first.instId, last: first.last, high24h: first.high24h, low24h: first.low24h },
+    };
+  });
+
+  await runStep("OKX K 線", async () => {
+    const rows = await publicClient.getKlines(body.symbol, "1m", 5);
+    if (rows.length === 0) throw new Error("K 線資料為空");
+    return { value: rows, details: { candleCount: rows.length, latestClose: rows[0]?.close ?? null } };
+  });
+
+  const privateClient = await runStep("OKX Demo API 憑證", async () => {
+    if (!hasCredentials()) throw new Error("OKX Demo API Variables 尚未設定完整");
+    return { value: getPrivateClient(), details: { configured: true, credentialsSource: "railway_variables" } };
+  });
+
+  const availableUsdt = privateClient
+    ? await runStep("OKX Demo 帳戶資產", async () => {
+        const balances = await privateClient.getAccountBalance();
+        const details = balances.flatMap((item) => item.details ?? []);
+        const usdt = details.find((item) => item.ccy.toUpperCase() === "USDT");
+        const available = Number(usdt?.availBal ?? 0);
+        return { value: available, details: { assetCount: details.length, availableUsdt: available } };
+      })
+    : null;
+
+  if (!body.executeDemoOrder) {
+    steps.push({ name: "OKX Demo 市價單", status: "skipped", durationMs: 0, details: { reason: "executeDemoOrder=false" } });
+  } else if (!privateClient) {
+    steps.push({ name: "OKX Demo 市價單", status: "skipped", durationMs: 0, details: { reason: "Demo API 憑證檢查未通過" } });
+  } else if (availableUsdt === null || availableUsdt < body.testUsdt) {
+    steps.push({
+      name: "OKX Demo 市價單",
+      status: "skipped",
+      durationMs: 0,
+      details: { reason: "Demo USDT 餘額不足", availableUsdt: availableUsdt ?? 0, requiredUsdt: body.testUsdt },
+    });
+  } else {
+    await runStep("OKX Demo 市價單", async () => {
+      const order = await privateClient.placeDemoOrder({
+        symbol: body.symbol,
+        side: "BUY",
+        type: "MARKET",
+        quantity: String(body.testUsdt),
+      });
+      return {
+        value: order,
+        details: { orderId: order.ordId, symbol: body.symbol, side: "BUY", type: "MARKET", testUsdt: body.testUsdt },
+      };
+    });
+  }
+
+  const failed = steps.filter((step) => step.status === "failed").length;
+  const skipped = steps.filter((step) => step.status === "skipped").length;
+  const passed = steps.filter((step) => step.status === "passed").length;
+  const success = failed === 0 && skipped === 0;
+
+  res.json({
+    success,
+    exchange: "OKX",
+    mode: "demo",
+    safeMode: true,
+    symbol: body.symbol,
+    tickerLast: ticker?.last ?? null,
+    startedAt: startedAt.toISOString(),
+    completedAt: new Date().toISOString(),
+    summary: { passed, failed, skipped, total: steps.length },
+    steps,
+    message: success ? "OKX 全系統 Demo 測試全部通過" : "OKX 全系統 Demo 測試未完全通過，請查看步驟結果",
+  });
 });
 
 export default router;
