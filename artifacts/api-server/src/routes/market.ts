@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { db, strategiesTable, backtestResultsTable, tradeRecordsTable } from "@workspace/db";
 import { createBitgetService } from "../services/bitget.js";
+import { createOkxService } from "../services/okx.js";
 
 const router = Router();
 
-const POPULAR_PAIRS = [
+const BITGET_PAIRS = [
   "BTCUSDT",
   "ETHUSDT",
   "SOLUSDT",
@@ -15,8 +16,18 @@ const POPULAR_PAIRS = [
   "AVAXUSDT",
 ];
 
-let lastRealFetch = 0;
-let cachedRealData: Array<{
+const OKX_PAIRS = [
+  "BTC-USDT",
+  "ETH-USDT",
+  "SOL-USDT",
+  "BNB-USDT",
+  "XRP-USDT",
+  "ADA-USDT",
+  "DOGE-USDT",
+  "AVAX-USDT",
+];
+
+type MarketRow = {
   symbol: string;
   price: number;
   change24h: number;
@@ -24,49 +35,88 @@ let cachedRealData: Array<{
   volume24h: number;
   high24h: number;
   low24h: number;
-}> | null = null;
+};
+
+type MarketProvider = "bitget" | "okx";
+
+let lastRealFetch = 0;
+let lastProvider: MarketProvider | null = null;
+let cachedRealData: MarketRow[] | null = null;
 const CACHE_TTL = 15_000;
 
+function getProvider(): MarketProvider {
+  return process.env.MARKET_DATA_SOURCE?.toLowerCase() === "okx" ? "okx" : "bitget";
+}
+
+async function fetchBitget(): Promise<MarketRow[]> {
+  const tickers = await createBitgetService().getTickers(BITGET_PAIRS);
+  return tickers.map((ticker) => {
+    const price = Number(ticker.lastPr);
+    const changePct24h = Number(ticker.change24h) * 100;
+    return {
+      symbol: ticker.symbol.replace("USDT", "/USDT"),
+      price,
+      change24h: price * (changePct24h / 100),
+      changePct24h,
+      volume24h: Number(ticker.quoteVolume),
+      high24h: Number(ticker.high24h),
+      low24h: Number(ticker.low24h),
+    };
+  });
+}
+
+async function fetchOkx(): Promise<MarketRow[]> {
+  const tickers = await createOkxService().getTickers(OKX_PAIRS);
+  return tickers.map((ticker) => {
+    const price = Number(ticker.last);
+    const open24h = Number(ticker.open24h);
+    const change24h = price - open24h;
+    const changePct24h = open24h > 0 ? (change24h / open24h) * 100 : 0;
+    return {
+      symbol: ticker.instId.replace("-", "/"),
+      price,
+      change24h,
+      changePct24h,
+      volume24h: Number(ticker.volCcy24h),
+      high24h: Number(ticker.high24h),
+      low24h: Number(ticker.low24h),
+    };
+  });
+}
+
 router.get("/summary", async (_req, res) => {
+  const provider = getProvider();
+  const source = provider === "okx" ? "okx_public_mainnet" : "bitget_public_mainnet";
   const now = Date.now();
 
-  if (cachedRealData && now - lastRealFetch < CACHE_TTL) {
+  if (cachedRealData && lastProvider === provider && now - lastRealFetch < CACHE_TTL) {
     return res.json({
-      source: "bitget_public_mainnet",
+      source,
+      provider,
       lastUpdated: new Date(lastRealFetch).toISOString(),
       data: cachedRealData,
     });
   }
 
   try {
-    const tickers = await createBitgetService().getTickers(POPULAR_PAIRS);
-    cachedRealData = tickers.map((ticker) => {
-      const price = Number(ticker.lastPr);
-      const changePct24h = Number(ticker.change24h) * 100;
-      return {
-        symbol: ticker.symbol.replace("USDT", "/USDT"),
-        price,
-        change24h: price * (changePct24h / 100),
-        changePct24h,
-        volume24h: Number(ticker.quoteVolume),
-        high24h: Number(ticker.high24h),
-        low24h: Number(ticker.low24h),
-      };
-    });
+    cachedRealData = provider === "okx" ? await fetchOkx() : await fetchBitget();
+    lastProvider = provider;
     lastRealFetch = now;
 
     return res.json({
-      source: "bitget_public_mainnet",
+      source,
+      provider,
       lastUpdated: new Date(lastRealFetch).toISOString(),
       data: cachedRealData,
     });
   } catch (error) {
     return res.status(502).json({
-      source: "bitget_public_mainnet",
+      source,
+      provider,
       error:
         error instanceof Error
           ? error.message
-          : "Bitget 公開主網行情暫時無法取得",
+          : `${provider.toUpperCase()} 公開主網行情暫時無法取得`,
       data: [],
     });
   }
