@@ -3,6 +3,8 @@ import { logger } from "./lib/logger";
 import { bootstrapAutoTrader } from "./services/autoTrader.js";
 import { bootstrapOkxSwapAiEngine } from "./services/okxSwapAiEngine.js";
 
+process.env.OKX_SWAP_MAX_POSITIONS ??= "10";
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
