@@ -1,4 +1,4 @@
-import { createOkxSwapService, contractsForNotional, type OkxSwapInstrument, type OkxSwapSide, type OkxSwapTicker } from "./okxSwap.js";
+import { createOkxSwapService, contractsForNotional, type OkxSwapInstrument, type OkxSwapKline, type OkxSwapSide, type OkxSwapTicker } from "./okxSwap.js";
 import { isOkxSwapSkillEnabled, listOkxSwapSkills } from "./okxSwapSkills.js";
 
 export type SwapSignalAction = "LONG" | "SHORT" | "HOLD";
@@ -79,6 +79,11 @@ function numberEnv(name: string, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function getPositionLimit(): number | null {
+  const raw = numberEnv("OKX_SWAP_MAX_POSITIONS", 0);
+  return raw > 0 ? Math.floor(raw) : null;
+}
+
 function log(level: "info" | "warn" | "error", message: string) {
   state.logs.unshift({ time: new Date().toISOString(), level, message });
   state.logs = state.logs.slice(0, 100);
@@ -122,11 +127,9 @@ function brokerSyncEnabled(): boolean {
   return process.env.OKX_SWAP_DEMO_ORDERS === "true" && process.env.OKX_NETWORK_MODE !== "mainnet";
 }
 
-function analyze(instId: string, ticker: OkxSwapTicker, candles: Awaited<ReturnType<ReturnType<typeof createOkxSwapService>["getSwapKlines"]>>): SwapAiSignal {
+function analyze(instId: string, ticker: OkxSwapTicker, candles: OkxSwapKline[]): SwapAiSignal {
   const rows = [...candles].reverse();
   const closes = rows.map((row) => row.close);
-  const highs = rows.map((row) => row.high);
-  const lows = rows.map((row) => row.low);
   const volumes = rows.map((row) => row.quoteVolume || row.volume);
   const price = Number(ticker.last || closes.at(-1) || 0);
   const fast = ema(closes.slice(-24), 8);
@@ -220,8 +223,8 @@ async function managePositions(universe: Awaited<ReturnType<typeof getUniverse>>
 async function maybeOpen(signal: SwapAiSignal, instrument: OkxSwapInstrument) {
   if (!isOkxSwapSkillEnabled("okx.swap.risk-guard") || signal.action === "HOLD") return;
   if (state.positions.some((position) => position.instId === signal.instId)) return;
-  const maxPositions = Math.max(1, Math.min(10, numberEnv("OKX_SWAP_MAX_POSITIONS", 3)));
-  if (state.positions.length >= maxPositions) return;
+  const positionLimit = getPositionLimit();
+  if (positionLimit !== null && state.positions.length >= positionLimit) return;
   const notionalUsdt = Math.max(5, Math.min(50, numberEnv("OKX_SWAP_POSITION_USDT", 15)));
   const totalExposure = state.positions.reduce((sum, position) => sum + position.notionalUsdt, 0);
   const maxExposure = Math.max(20, Math.min(250, numberEnv("OKX_SWAP_MAX_EXPOSURE_USDT", 60)));
@@ -275,7 +278,17 @@ export async function runOkxSwapAiCycle() {
 }
 
 export function getOkxSwapAiState() {
-  return { ...state, positions: [...state.positions], latestSignals: [...state.latestSignals], logs: [...state.logs], skills: listOkxSwapSkills(), brokerSyncEnabled: brokerSyncEnabled(), intervalMs: Math.max(20_000, numberEnv("OKX_SWAP_AI_INTERVAL_MS", 45_000)) };
+  return {
+    ...state,
+    positions: [...state.positions],
+    latestSignals: [...state.latestSignals],
+    logs: [...state.logs],
+    skills: listOkxSwapSkills(),
+    brokerSyncEnabled: brokerSyncEnabled(),
+    intervalMs: Math.max(20_000, numberEnv("OKX_SWAP_AI_INTERVAL_MS", 45_000)),
+    positionLimit: getPositionLimit(),
+    maxExposureUsdt: Math.max(20, Math.min(250, numberEnv("OKX_SWAP_MAX_EXPOSURE_USDT", 60))),
+  };
 }
 
 export function startOkxSwapAiEngine() {
