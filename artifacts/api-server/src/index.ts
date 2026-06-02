@@ -19,13 +19,22 @@ process.env.OKX_SWAP_AI_INTERVAL_MS ??= "30000";
 process.env.OKX_SWAP_AI_LONG_SCORE ??= "65";
 process.env.OKX_SWAP_AI_SHORT_SCORE ??= "35";
 
+// Guarded Demo-only automatic tuning defaults.
+// AI may adjust entry thresholds, base position size and leverage within hard bounds only.
+process.env.OKX_SWAP_AUTO_TUNE_ENABLED ??= "true";
+process.env.OKX_SWAP_AUTO_TUNE_COOLDOWN_HOURS ??= "6";
+process.env.OKX_SWAP_AUTO_TUNE_MIN_POSITION_USDT ??= "2";
+process.env.OKX_SWAP_AUTO_TUNE_MAX_POSITION_USDT ??= "5";
+process.env.OKX_SWAP_AUTO_TUNE_MAX_SINGLE_USDT ??= "5";
+process.env.OKX_SWAP_AUTO_TUNE_MAX_LEVERAGE ??= "3";
+
 // Read-only shadow learning defaults. This service reads public OKX market data,
-// simulates candidate profiles, and never places orders or changes live settings.
+// simulates candidate profiles, and never places orders by itself.
 process.env.OKX_SWAP_OPTIMIZER_ENABLED ??= "true";
 process.env.OKX_SWAP_OPTIMIZER_INTERVAL_MS ??= "60000";
 process.env.OKX_SWAP_OPTIMIZER_SCAN_BATCH ??= "12";
-process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES ??= "24";
-process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT ??= "5";
+process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES ??= "50";
+process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT ??= "8";
 
 const rawPort = process.env["PORT"];
 
