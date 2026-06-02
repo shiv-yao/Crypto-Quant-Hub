@@ -59,21 +59,30 @@ export interface EvolutionMetrics {
   score: number;
 }
 
+interface Approval {
+  time: string;
+  from: string;
+  to: string;
+  improvement: number;
+  source: "auto" | "manual";
+}
+
 interface EvolutionState {
   hydrated: boolean;
   runtimeProfileId: string;
   recommendedProfileId: string | null;
   shadowTrades: ShadowTrade[];
   outcomes: EvolutionOutcome[];
-  approvals: Array<{ time: string; from: string; to: string; improvement: number }>;
+  approvals: Approval[];
   lastEvaluationAt: string | null;
+  lastAutoAppliedAt: string | null;
 }
 
 const PROFILES: EvolutionProfile[] = [
   { id: "balanced", name: "平衡型", entryScoreOffset: 0, riskScale: 1, maxLeverage: 2, description: "作為基準參數組，兼顧觸發率與風控。" },
-  { id: "selective", name: "精選型", entryScoreOffset: 4, riskScale: 0.9, maxLeverage: 2, description: "提高進場門檻，減少低品質訊號。" },
-  { id: "trend", name: "趨勢型", entryScoreOffset: 2, riskScale: 1.05, maxLeverage: 2, description: "保留趨勢訊號，適度提高基準倉位。" },
-  { id: "defensive", name: "防守型", entryScoreOffset: 5, riskScale: 0.72, maxLeverage: 1, description: "降低倉位與槓桿，優先壓低回撤。" },
+  { id: "selective", name: "精選型", entryScoreOffset: 4, riskScale: 0.82, maxLeverage: 2, description: "提高進場門檻，減少低品質訊號。" },
+  { id: "trend", name: "趨勢型", entryScoreOffset: 2, riskScale: 1.08, maxLeverage: 3, description: "保留趨勢訊號，在硬性上限內適度提高倉位與槓桿。" },
+  { id: "defensive", name: "防守型", entryScoreOffset: 5, riskScale: 0.65, maxLeverage: 1, description: "降低倉位與槓桿，優先壓低回撤。" },
 ];
 
 const state: EvolutionState = {
@@ -84,6 +93,7 @@ const state: EvolutionState = {
   outcomes: [],
   approvals: [],
   lastEvaluationAt: null,
+  lastAutoAppliedAt: null,
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -103,6 +113,25 @@ function profile(id: string) {
   return PROFILES.find((item) => item.id === id) ?? PROFILES[0];
 }
 
+function getHardBounds() {
+  const minPositionUsdt = clamp(safeNumber(process.env.OKX_SWAP_AUTO_TUNE_MIN_POSITION_USDT, 2), 1, 5);
+  const maxPositionUsdt = clamp(safeNumber(process.env.OKX_SWAP_AUTO_TUNE_MAX_POSITION_USDT, 5), minPositionUsdt, 10);
+  const maxSingleUsdt = clamp(safeNumber(process.env.OKX_SWAP_AUTO_TUNE_MAX_SINGLE_USDT, 5), maxPositionUsdt, 10);
+  const maxLeverage = clamp(safeNumber(process.env.OKX_SWAP_AUTO_TUNE_MAX_LEVERAGE, 3), 1, 3);
+  return { minPositionUsdt, maxPositionUsdt, maxSingleUsdt, maxLeverage };
+}
+
+function applyProfileToRuntime(profileId: string) {
+  const selected = profile(profileId);
+  const bounds = getHardBounds();
+  const basePositionUsdt = clamp(round(5 * selected.riskScale), bounds.minPositionUsdt, bounds.maxPositionUsdt);
+  process.env.OKX_SWAP_AI_LONG_SCORE = String(63 + selected.entryScoreOffset);
+  process.env.OKX_SWAP_AI_SHORT_SCORE = String(37 - selected.entryScoreOffset);
+  process.env.OKX_SWAP_POSITION_USDT = String(basePositionUsdt);
+  process.env.OKX_SWAP_MAX_SINGLE_USDT = String(bounds.maxSingleUsdt);
+  process.env.OKX_SWAP_MAX_LEVERAGE = String(Math.min(selected.maxLeverage, bounds.maxLeverage));
+}
+
 function persistSnapshot() {
   void db.insert(auditLogsTable).values({
     action: "okx_swap_shadow_optimizer_snapshot",
@@ -112,6 +141,7 @@ function persistSnapshot() {
       approvals: state.approvals.slice(0, 50),
       outcomes: state.outcomes.slice(0, 500),
       lastEvaluationAt: state.lastEvaluationAt,
+      lastAutoAppliedAt: state.lastAutoAppliedAt,
     },
     mode: "okx_demo",
     source: "okx_swap_shadow_optimizer",
@@ -134,9 +164,11 @@ export async function hydrateEvolutionState() {
     if (Array.isArray(details?.approvals)) state.approvals = details.approvals;
     if (Array.isArray(details?.outcomes)) state.outcomes = details.outcomes;
     state.lastEvaluationAt = details?.lastEvaluationAt ?? null;
+    state.lastAutoAppliedAt = details?.lastAutoAppliedAt ?? null;
   } catch {
     // Database may still be starting. Continue with safe defaults.
   } finally {
+    applyProfileToRuntime(state.runtimeProfileId);
     state.hydrated = true;
   }
 }
@@ -216,8 +248,8 @@ export function metricsFor(profileId: string): EvolutionMetrics {
 }
 
 export function evaluateEvolution() {
-  const minTrades = Math.max(12, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES, 24));
-  const minImprovement = Math.max(2, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT, 5));
+  const minTrades = Math.max(24, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES, 50));
+  const minImprovement = Math.max(5, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT, 8));
   const current = metricsFor(state.runtimeProfileId);
   const candidates = PROFILES
     .map((item) => ({ item, metrics: metricsFor(item.id) }))
@@ -230,21 +262,32 @@ export function evaluateEvolution() {
   return getEvolutionState();
 }
 
-export function applyRecommendation() {
+export function applyRecommendation(source: "auto" | "manual" = "manual") {
   if (!state.recommendedProfileId) throw new Error("目前沒有通過影子驗證的參數建議");
+  if (process.env.OKX_NETWORK_MODE !== "testnet") throw new Error("自動調參只允許 OKX Demo testnet 模式");
   const previous = state.runtimeProfileId;
   const next = profile(state.recommendedProfileId);
   const improvement = round(metricsFor(next.id).score - metricsFor(previous).score);
   state.runtimeProfileId = next.id;
   state.recommendedProfileId = null;
-  state.approvals.unshift({ time: new Date().toISOString(), from: previous, to: next.id, improvement });
-  process.env.OKX_SWAP_AI_LONG_SCORE = String(63 + next.entryScoreOffset);
-  process.env.OKX_SWAP_AI_SHORT_SCORE = String(37 - next.entryScoreOffset);
-  process.env.OKX_SWAP_POSITION_USDT = String(round(clamp(10 * next.riskScale, 5, 30)));
-  process.env.OKX_SWAP_MAX_SINGLE_USDT = String(round(clamp(30 * next.riskScale, 10, 50)));
-  process.env.OKX_SWAP_MAX_LEVERAGE = String(next.maxLeverage);
+  const time = new Date().toISOString();
+  state.approvals.unshift({ time, from: previous, to: next.id, improvement, source });
+  if (source === "auto") state.lastAutoAppliedAt = time;
+  applyProfileToRuntime(next.id);
   persistSnapshot();
   return getEvolutionState();
+}
+
+export function autoApplyRecommendationIfEligible() {
+  if (process.env.OKX_SWAP_AUTO_TUNE_ENABLED !== "true") return { applied: false, reason: "auto_tune_disabled" };
+  if (process.env.OKX_NETWORK_MODE !== "testnet") return { applied: false, reason: "demo_testnet_required" };
+  if (!state.recommendedProfileId) return { applied: false, reason: "no_validated_recommendation" };
+  const cooldownHours = Math.max(1, safeNumber(process.env.OKX_SWAP_AUTO_TUNE_COOLDOWN_HOURS, 6));
+  const lastAppliedMs = state.lastAutoAppliedAt ? new Date(state.lastAutoAppliedAt).getTime() : 0;
+  if (lastAppliedMs && Date.now() - lastAppliedMs < cooldownHours * 60 * 60 * 1000) return { applied: false, reason: "cooldown_active" };
+  const previous = state.runtimeProfileId;
+  const result = applyRecommendation("auto");
+  return { applied: true, reason: "validated_profile_applied", previous, current: result.runtimeProfileId };
 }
 
 export function getEvolutionState() {
@@ -260,14 +303,18 @@ export function getEvolutionState() {
     outcomeCount: state.outcomes.length,
     approvals: state.approvals.slice(0, 20),
     lastEvaluationAt: state.lastEvaluationAt,
-    minTrades: Math.max(12, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES, 24)),
-    minImprovement: Math.max(2, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT, 5)),
+    lastAutoAppliedAt: state.lastAutoAppliedAt,
+    autoTuneEnabled: process.env.OKX_SWAP_AUTO_TUNE_ENABLED === "true" && process.env.OKX_NETWORK_MODE === "testnet",
+    autoTuneCooldownHours: Math.max(1, safeNumber(process.env.OKX_SWAP_AUTO_TUNE_COOLDOWN_HOURS, 6)),
+    minTrades: Math.max(24, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_TRADES, 50)),
+    minImprovement: Math.max(5, safeNumber(process.env.OKX_SWAP_OPTIMIZER_MIN_IMPROVEMENT, 8)),
+    hardBounds: getHardBounds(),
     runtimeParameters: {
       longScore: safeNumber(process.env.OKX_SWAP_AI_LONG_SCORE, 63),
       shortScore: safeNumber(process.env.OKX_SWAP_AI_SHORT_SCORE, 37),
-      basePositionUsdt: safeNumber(process.env.OKX_SWAP_POSITION_USDT, 10),
-      maxSingleUsdt: safeNumber(process.env.OKX_SWAP_MAX_SINGLE_USDT, 30),
-      maxLeverage: safeNumber(process.env.OKX_SWAP_MAX_LEVERAGE, 2),
+      basePositionUsdt: safeNumber(process.env.OKX_SWAP_POSITION_USDT, 5),
+      maxSingleUsdt: safeNumber(process.env.OKX_SWAP_MAX_SINGLE_USDT, 5),
+      maxLeverage: safeNumber(process.env.OKX_SWAP_MAX_LEVERAGE, 3),
     },
   };
 }
@@ -279,6 +326,8 @@ export function resetEvolution() {
   state.outcomes = [];
   state.approvals = [];
   state.lastEvaluationAt = null;
+  state.lastAutoAppliedAt = null;
+  applyProfileToRuntime("balanced");
   persistSnapshot();
   return getEvolutionState();
 }
