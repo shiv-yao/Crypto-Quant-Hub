@@ -1,5 +1,6 @@
 import { createOkxSwapService, type OkxSwapKline, type OkxSwapTicker } from "./okxSwap.js";
 import {
+  autoApplyRecommendationIfEligible,
   evaluateEvolution,
   getEvolutionState,
   hydrateEvolutionState,
@@ -107,7 +108,7 @@ function scoreSignal(ticker: OkxSwapTicker, candles: OkxSwapKline[]) {
     action: score >= 63 ? "LONG" as const : score <= 37 ? "SHORT" as const : "HOLD" as const,
     plan: {
       leverage: volatilityRegime === "high" ? 1 : confidence >= 55 ? 2 : 1,
-      notionalUsdt: 10,
+      notionalUsdt: 5,
       stopLossPct,
       takeProfitPct: clamp(stopLossPct * (1.65 + confidence / 100), 1.8, 9),
       trailingStopPct: clamp(stopLossPct * 0.62, 0.65, 2.8),
@@ -151,7 +152,11 @@ export async function runOkxSwapOptimizerCycle() {
     }
     state.scannedCount += batch.length;
     state.cycleCount += 1;
-    if (state.cycleCount % 10 === 0) evaluateEvolution();
+    if (state.cycleCount % 10 === 0) {
+      evaluateEvolution();
+      const autoResult = autoApplyRecommendationIfEligible();
+      if (autoResult.applied) log("info", `已自動套用通過影子驗證的參數組：${autoResult.previous} → ${autoResult.current}`);
+    }
     state.lastCycleAt = new Date().toISOString();
   } catch (error) {
     state.lastError = error instanceof Error ? error.message : "未知錯誤";
@@ -163,13 +168,14 @@ export async function runOkxSwapOptimizerCycle() {
 }
 
 export function getOkxSwapOptimizerState() {
+  const evolution = getEvolutionState();
   return {
     ...state,
     logs: [...state.logs],
     intervalMs: Math.max(20_000, numberEnv("OKX_SWAP_OPTIMIZER_INTERVAL_MS", 60_000)),
-    evolution: getEvolutionState(),
+    evolution,
     sendsOrders: false,
-    autoApplyRecommendations: false,
+    autoApplyRecommendations: evolution.autoTuneEnabled,
   };
 }
 
