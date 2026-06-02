@@ -1,6 +1,5 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { bootstrapAutoTrader } from "./services/autoTrader.js";
 import { bootstrapOkxSwapAiEngine } from "./services/okxSwapAiEngine.js";
 import { bootstrapOkxSwapOptimizer } from "./services/okxSwapOptimizerRunner.js";
 
@@ -57,7 +56,6 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
-  bootstrapAutoTrader();
   bootstrapOkxSwapAiEngine();
   bootstrapOkxSwapOptimizer();
 });
