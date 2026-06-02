@@ -10,7 +10,7 @@ import { bootstrapOkxSwapOptimizer } from "./services/okxSwapOptimizerRunner.js"
 process.env.OKX_SWAP_MAX_POSITIONS ??= "0";
 process.env.OKX_SWAP_POSITION_USDT ??= "5";
 process.env.OKX_SWAP_MAX_SINGLE_USDT ??= "5";
-process.env.OKX_SWAP_MAX_EXPOSURE_USDT ??= "50";
+process.env.OKX_SWAP_MAX_EXPOSURE_USDT ??= "500";
 process.env.OKX_SWAP_MAX_LEVERAGE ??= "3";
 process.env.OKX_SWAP_STOP_LOSS_PCT ??= "1.2";
 process.env.OKX_SWAP_TAKE_PROFIT_PCT ??= "2.4";
