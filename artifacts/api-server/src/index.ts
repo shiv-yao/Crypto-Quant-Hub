@@ -6,7 +6,8 @@ import { bootstrapOkxSwapOptimizer } from "./services/okxSwapOptimizerRunner.js"
 
 // OKX Swap AI Demo: higher-leverage, lower-capital stress-test defaults.
 // Railway Variables still take precedence. Mainnet trading remains locked.
-process.env.OKX_SWAP_MAX_POSITIONS ??= "10";
+// OKX_SWAP_MAX_POSITIONS=0 means unlimited position count; exposure guards still apply.
+process.env.OKX_SWAP_MAX_POSITIONS ??= "0";
 process.env.OKX_SWAP_POSITION_USDT ??= "5";
 process.env.OKX_SWAP_MAX_SINGLE_USDT ??= "5";
 process.env.OKX_SWAP_MAX_EXPOSURE_USDT ??= "50";
