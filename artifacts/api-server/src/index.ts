@@ -14,6 +14,7 @@ process.env.OKX_SWAP_MAX_LEVERAGE ??= "2";
 process.env.OKX_SWAP_STOP_LOSS_PCT ??= "1.0";
 process.env.OKX_SWAP_TAKE_PROFIT_PCT ??= "2.2";
 process.env.OKX_SWAP_SCAN_BATCH ??= "12";
+process.env.OKX_SWAP_TOP_VOLUME_LIMIT ??= "30";
 process.env.OKX_SWAP_AI_INTERVAL_MS ??= "30000";
 process.env.OKX_SWAP_AI_LONG_SCORE ??= "70";
 process.env.OKX_SWAP_AI_SHORT_SCORE ??= "30";
@@ -21,6 +22,7 @@ process.env.OKX_SWAP_MIN_CONFIDENCE ??= "42";
 process.env.OKX_SWAP_MIN_TREND_STRENGTH ??= "0.18";
 process.env.OKX_SWAP_MIN_VOLUME_RATIO ??= "0.85";
 process.env.OKX_SWAP_MAX_ENTRY_ATR_PCT ??= "3.0";
+process.env.OKX_SWAP_DAILY_STOP_PCT ??= "3";
 process.env.OKX_SWAP_LOSS_COOLDOWN_MINUTES ??= "30";
 process.env.OKX_SWAP_MAX_CONSECUTIVE_LOSSES ??= "2";
 
